@@ -76,6 +76,7 @@ async deleteUser(req, res) {
   const { id } = req.params;
 
   // Solo los administradores pueden eliminar usuarios
+  console.log("tipo usuario: "+ req.user.tipo);
   if (req.user.tipo !== 'administrador') {
     return res.status(403).send('Acceso denegado');
   }

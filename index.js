@@ -31,6 +31,7 @@ app.use('/api/contratos', contratoRoutes);
 
 app.use('/api', reporteRouter); 
 
-app.listen(5000,'localhost', () => {
-  console.log('Servidor corriendo en http://localhost:5000');
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Servidor corriendo en el puerto ${PORT}`);
 });

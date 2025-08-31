@@ -45,7 +45,7 @@ async updateUser(req, res) {
   const { id } = req.params;
   const { nombre,telefono, email, password,activado, tipo_usuario } = req.body;
   console.log("tipo Usuario:"+ req.user.tipo_usuario);
-  if (req.user.tipo_usuario !== 'administrador') {
+  if (req.user.tipo !== 'administrador') {
     return res.status(403).send('Acceso denegado');
   }
 

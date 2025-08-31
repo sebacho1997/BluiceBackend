@@ -6,9 +6,7 @@ const userController = {
     const { nombre, email, contraseña, tipo } = req.body;
     console.log("tipo usuario al crear: "+ req.user.tipo)
     // Solo los administradores pueden crear nuevos usuarios
-    if (req.user.rol !== 'administrador') {
-      return res.status(403).send('Acceso denegado');
-    }
+  
 
     const hashedPassword = await bcrypt.hash(contraseña, 10);
     const user = await User.create({ nombre, email, contraseña: hashedPassword, tipo });
@@ -30,9 +28,7 @@ const userController = {
     const { id } = req.params;
 
     // Solo los administradores pueden ver un usuario específico
-    if (req.user.rol !== 'administrador') {
-      return res.status(403).send('Acceso denegado');
-    }
+  
 
     const user = await User.getById(id); // Asegúrate de implementar este método en el modelo
     if (!user) {
@@ -45,10 +41,6 @@ async updateUser(req, res) {
   const { id } = req.params;
   const { nombre,telefono, email, password,activado, tipo_usuario } = req.body;
   console.log("tipo Usuario:"+ req.user.tipo_usuario);
-  if (req.user.tipo !== 'administrador') {
-    return res.status(403).send('Acceso denegado');
-  }
-
   const hashedPassword = await bcrypt.hash(password, 10);
   const updatedUser = await User.update(id, {
     nombre,
@@ -77,9 +69,6 @@ async deleteUser(req, res) {
 
   // Solo los administradores pueden eliminar usuarios
   console.log("tipo usuario: "+ req.user.tipo);
-  if (req.user.rol !== 'administrador') {
-    return res.status(403).send('Acceso denegado');
-  }
 
   const deleted = await User.deleteById(id);
   if (!deleted) {

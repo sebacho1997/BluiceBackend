@@ -4,9 +4,9 @@ const bcrypt = require('bcryptjs');
 const userController = {
   async createUser(req, res) {
     const { nombre, email, contraseña, tipo } = req.body;
-    console.log("tipo usuario al crear: "+ req.user.tipo);
+    console.log("tipo usuario al crear: "+ req.user.tipo)
     // Solo los administradores pueden crear nuevos usuarios
-    if (req.user.tipo !== 'administrador') {
+    if (req.user.rol !== 'administrador') {
       return res.status(403).send('Acceso denegado');
     }
 
@@ -30,7 +30,7 @@ const userController = {
     const { id } = req.params;
 
     // Solo los administradores pueden ver un usuario específico
-    if (req.user.tipo !== 'administrador') {
+    if (req.user.rol !== 'administrador') {
       return res.status(403).send('Acceso denegado');
     }
 
@@ -77,7 +77,7 @@ async deleteUser(req, res) {
 
   // Solo los administradores pueden eliminar usuarios
   console.log("tipo usuario: "+ req.user.tipo);
-  if (req.user.tipo !== 'administrador') {
+  if (req.user.rol !== 'administrador') {
     return res.status(403).send('Acceso denegado');
   }
 

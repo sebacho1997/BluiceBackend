@@ -4,7 +4,7 @@ const bcrypt = require('bcryptjs');
 const userController = {
   async createUser(req, res) {
     const { nombre, email, contraseña, tipo } = req.body;
-
+    console.log("tipo usuario al crear: "+ req.user.tipo);
     // Solo los administradores pueden crear nuevos usuarios
     if (req.user.tipo !== 'administrador') {
       return res.status(403).send('Acceso denegado');

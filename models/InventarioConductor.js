@@ -23,21 +23,21 @@ const InventarioConductor = {
       return null;
     }
   },
-   async existeInventarioHoy(conductorId) {
-    try {
-      const query = `
-        SELECT COUNT(*) AS count
-        FROM inventarios
-        WHERE id_conductor = $1
-          AND DATE(fecha) = CURRENT_DATE
-      `;
-      const result = await pool.query(query, [conductorId]);
-      return result.rows[0].count > 0;
-    } catch (error) {
-      console.error('Error en InventarioModel.existeInventarioHoy:', error);
-      throw error;
-    }
-  },
+   async existeInventarioHoy(conductorId) { 
+  try {
+    const query = `
+      SELECT COUNT(*) AS count
+      FROM inventarios
+      WHERE id_conductor = $1
+        AND fecha::date = CURRENT_DATE
+    `;
+    const result = await pool.query(query, [conductorId]);
+    return Number(result.rows[0].count) > 0; // Convertimos a número
+  } catch (error) {
+    console.error('Error en InventarioModel.existeInventarioHoy:', error);
+    throw error;
+  }
+},
  async getInventarioHoy(conductorId) {
   console.log('entra getinventariohoy');
   try {

@@ -11,6 +11,7 @@ const pedidoImagenesRoutes = require("./routes/pedidoImagenesRoutes");
 const prestamoEquipoRoutes = require('./routes/prestamoEquipoRoutes');
 const gastosDiaRoutes = require('./routes/gastosDiaRoutes');
 const contratoRoutes = require('./routes/contratoRoutes');
+const reporteMes= require('./models/reporteMes');
 
 const reporteRouter = require('./models/prueba');
 const app = express();
@@ -30,6 +31,7 @@ app.use('/api/gastos', gastosDiaRoutes);
 app.use('/api/contratos', contratoRoutes);
 
 app.use('/api', reporteRouter); 
+app.use('/api', reporteMes); 
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, "0.0.0.0", () => {

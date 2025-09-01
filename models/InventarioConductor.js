@@ -27,8 +27,8 @@ const InventarioConductor = {
   try {
     const query = `
       SELECT COUNT(*) AS count
-      FROM inventarios
-      WHERE id_conductor = $1
+      FROM inventario_conductor
+      WHERE conductor_id = $1
         AND fecha::date = CURRENT_DATE
     `;
     const result = await pool.query(query, [conductorId]);

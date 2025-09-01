@@ -76,7 +76,7 @@ const InventarioConductorController = {
         return res.status(400).json({ message: 'Falta el conductorId' });
       }
 
-      const existe = await InventarioModel.existeInventarioHoy(conductorId);
+      const existe = await InventarioConductor.existeInventarioHoy(conductorId);
 
       return res.status(200).json({ existe });
     } catch (error) {

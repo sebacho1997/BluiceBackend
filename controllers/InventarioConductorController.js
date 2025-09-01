@@ -69,6 +69,21 @@ const InventarioConductorController = {
       res.status(500).json({ message: 'Error del servidor' });
     }
   },
+   async existeInventarioHoy(req, res) {
+    try {
+      const { conductorId } = req.params;
+      if (!conductorId) {
+        return res.status(400).json({ message: 'Falta el conductorId' });
+      }
+
+      const existe = await InventarioModel.existeInventarioHoy(conductorId);
+
+      return res.status(200).json({ existe });
+    } catch (error) {
+      console.error('Error en InventarioController.existeInventarioHoy:', error);
+      return res.status(500).json({ message: 'Error al verificar inventario' });
+    }
+  },
   async cerrarInventario(req, res) {
   try {
     const { inventario_id } = req.body;

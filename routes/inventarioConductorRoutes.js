@@ -10,7 +10,7 @@ const InventarioConductorController = require('../controllers/InventarioConducto
 router.post('/', InventarioConductorController.crearInventario);
 
 router.get('/hoy/:conductor_id', InventarioConductorController.getInventarioHoy);
-
+router.get('/existe/:conductorId', InventarioConductorController.existeInventarioHoy);
 // Obtener todos los inventarios de un conductor
 router.get('/:conductor_id', InventarioConductorController.obtenerInventarios);
 

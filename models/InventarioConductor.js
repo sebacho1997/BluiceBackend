@@ -29,7 +29,7 @@ const InventarioConductor = {
       SELECT COUNT(*) AS count
       FROM inventario_conductor
       WHERE conductor_id = $1
-        AND DATE(fecha) = CURRENT_DATE
+        AND DATE(fecha_creacion) = CURRENT_DATE
     `;
     const result = await pool.query(query, [conductorId]);
     return Number(result.rows[0].count) > 0; // Convertimos a número

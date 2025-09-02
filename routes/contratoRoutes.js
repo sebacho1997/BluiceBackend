@@ -14,6 +14,8 @@ router.put('/:id/asignar-conductor', ContratosController.asignarConductor);
 router.get('/:contrato_id/consumos', ContratosController.getConsumos);
 router.post('/consumos', ContratosController.createConsumo);
 router.delete('/consumos/:id', ContratosController.deleteConsumo);
+router.put('/:consumoId/entregado', ContratosController.marcarEntregado);
+
 
 // === DETALLES ===
 router.get('/detalles/:consumo_id', ContratosController.getDetallesByConsumo);

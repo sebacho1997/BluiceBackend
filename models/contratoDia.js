@@ -25,19 +25,19 @@ router.get('/reporte-contratos/:conductorId', async (req, res) => {
     );
     const conductorNombre = conductorRes.rows.length ? conductorRes.rows[0].nombre : 'Desconocido';
 
-    // Contratos del conductor activos
+    // Contratos del conductor asignados
     const contratosRes = await pool.query(`
       SELECT c.id, c.cliente_id, u.nombre AS cliente_nombre,
              c.monto_total, c.monto_restante, c.fecha_inicio, c.fecha_fin, c.estado
       FROM contratos c
       JOIN usuarios u ON u.id = c.cliente_id
       WHERE c.conductor_id = $1
-        AND c.estado = 'activo'
+        AND c.estado = 'asignado'
       ORDER BY c.id
     `, [conductorId]);
 
     const contratos = contratosRes.rows;
-    if (!contratos.length) return res.status(404).send('No hay contratos activos para este conductor');
+    if (!contratos.length) return res.status(404).send('No hay contratos asignados para este conductor');
 
     const contratoIds = contratos.map(c => c.id);
 

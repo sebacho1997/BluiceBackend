@@ -96,6 +96,21 @@ async asignarConductor(req, res) {
     res.status(500).json({ error: err.message });
   }
 },
+
+ async marcarEntregado(req, res) {
+    const { consumoId } = req.params;
+    try {
+      const consumo = await ConsumoModel.marcarEntregado(consumoId);
+      if (!consumo) {
+        return res.status(404).json({ message: 'Consumo no encontrado' });
+      }
+      res.json({ success: true, consumo });
+    } catch (err) {
+      console.error('Error en marcarEntregado:', err);
+      res.status(500).json({ success: false, error: 'Error interno del servidor' });
+    }
+  },
+
 async createDetalle(req, res) {
   try {
     const { consumo_id, producto_id, cantidad } = req.body;

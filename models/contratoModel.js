@@ -78,7 +78,7 @@ const ContratosModel = {
   const result = await pool.query(
     `INSERT INTO consumos_contrato (contrato_id, monto_consumido, observaciones)
      VALUES ($1, $2, $3) RETURNING *`,
-    [contrato_id, monto_consumido, observaciones]
+    [contrato_id, monto_consumido, "creado"]
   );
 
     // restar monto_restante del contrato
@@ -106,7 +106,23 @@ const ContratosModel = {
   );
   return result.rows;
 },
-
+ async marcarEntregado(consumoId) {
+    try {
+      const fechaEntrega = new Date().toISOString();
+      const result = await pool.query(
+        `UPDATE consumos
+         SET observaciones = $1,
+             fecha_entrega = $2
+         WHERE id = $3
+         RETURNING *`,
+        ['entregado', fechaEntrega, consumoId]
+      );
+      return result.rows[0];
+    } catch (err) {
+      console.error('Error en ConsumoModel.marcarEntregado:', err);
+      throw err;
+    }
+  },
   async createDetalles({ consumo_id, producto_id, cantidad }) {
   const query = `
     INSERT INTO consumo_detalle (consumo_id, producto_id, cantidad)

@@ -28,9 +28,9 @@ const ContratosModel = {
   },
   async asignarConductor(id, conductor_id) {
   const result = await pool.query(
-    'UPDATE contratos SET conductor_id=$1 ,estado=$2 WHERE id=$2 RETURNING *',
-    [conductor_id,"asignado", id]
-  );
+  'UPDATE contratos SET conductor_id=$1, estado=$2 WHERE id=$3 RETURNING *',
+  [conductor_id, "asignado", id]
+);
   return result.rows[0];
 },
   async updateContrato(id, { cliente_id, monto_total, monto_restante, fecha_inicio, fecha_fin, estado, conductor_id }) {

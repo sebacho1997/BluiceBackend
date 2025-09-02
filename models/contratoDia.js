@@ -41,7 +41,7 @@ router.get('/reporte-consumos-dia/:conductorId', async (req, res) => {
        JOIN usuarios u ON u.id = c.cliente_id
        WHERE cc.contrato_id = ANY($1)
          AND cc.fecha_entrega = CURRENT_DATE
-       ORDER BY cc.id`,
+       ORDER BY cc.contrato_id, cc.id`,
       [contratoIds]
     );
 
@@ -66,8 +66,20 @@ router.get('/reporte-consumos-dia/:conductorId', async (req, res) => {
 
     // Construir contenido del PDF
     let totalProductos = {};
+    const contentConsumidos = [];
+    let contratoAnterior = null;
 
-    const contentConsumidos = consumos.map(c => {
+    consumos.forEach(c => {
+      // Encabezado para cada contrato nuevo
+      if (c.contrato_id !== contratoAnterior) {
+        contentConsumidos.push({
+          text: `Contrato ID: ${c.contrato_id} | Cliente: ${c.cliente_nombre}`,
+          style: 'contratoHeader',
+          margin: [0, 10, 0, 5]
+        });
+        contratoAnterior = c.contrato_id;
+      }
+
       const detalles = detalleMap[c.consumo_id] || [];
 
       detalles.forEach(d => {
@@ -87,15 +99,14 @@ router.get('/reporte-consumos-dia/:conductorId', async (req, res) => {
         margin: [0, 5, 0, 10]
       };
 
-      return {
+      contentConsumidos.push({
         stack: [
-          { text: `Cliente: ${c.cliente_nombre}`, style: 'consumoCliente' },
           { text: `Consumo ID: ${c.consumo_id}`, style: 'consumoId' },
           productosTable,
           { text: `Monto Consumido: Bs${c.monto_consumido}`, style: 'totalesConsumo' },
           { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 780, y2: 0, lineWidth: 1, lineColor: '#CCCCCC' }], margin: [0, 5, 0, 5] }
         ]
-      };
+      });
     });
 
     // Tabla resumen de productos totales
@@ -126,7 +137,7 @@ router.get('/reporte-consumos-dia/:conductorId', async (req, res) => {
       styles: {
         header: { fontSize: 20, bold: true, color: '#2E86C1' },
         subHeader: { fontSize: 14, italics: true, color: '#555555' },
-        consumoCliente: { fontSize: 12, bold: true, color: '#1F618D', margin: [0, 5, 0, 0] },
+        contratoHeader: { fontSize: 14, bold: true, color: '#D35400', margin: [0, 5, 0, 5] },
         consumoId: { fontSize: 10, color: '#555555', margin: [0, 0, 0, 5] },
         totalesConsumo: { fontSize: 10, margin: [0, 2, 0, 5] },
         tableHeader: { bold: true, fillColor: '#D6EAF8' }

@@ -30,8 +30,10 @@ const pedidoController = {
     }
   },
   async getClientesDeudores(req, res) {
+    console.log("entro a controller de deudores");
     try {
       const clientes = await ClientesDeudoresModel.getClientesDeudores();
+      console.log("deudores: "+clientes);
       res.json(clientes);
     } catch (err) {
       res.status(500).json({ error: 'Error al obtener clientes deudores' });

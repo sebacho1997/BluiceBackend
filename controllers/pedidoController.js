@@ -32,7 +32,7 @@ const pedidoController = {
   async getClientesDeudores(req, res) {
     console.log("entro a controller de deudores");
     try {
-      const clientes = await ClientesDeudoresModel.getClientesDeudores();
+      const clientes = await Pedido.getClientesDeudores();
       console.log("deudores: "+clientes);
       res.json(clientes);
     } catch (err) {

@@ -4,7 +4,6 @@ const PdfPrinter = require('pdfmake');
 const pool = require('../config/db');
 
 router.get('/reporte-deudas-clientes', async (req, res) => {
-  // Fuentes internas
   const fonts = {
     Roboto: {
       normal: 'Helvetica',
@@ -16,60 +15,107 @@ router.get('/reporte-deudas-clientes', async (req, res) => {
   const printer = new PdfPrinter(fonts);
 
   try {
-    // Obtener deudas por cliente
-    const clientesRes = await pool.query(`
-      SELECT 
-        u.id AS cliente_id,
-        u.nombre AS cliente_nombre,
-        u.telefono,
-        u.email,
-        SUM(p.monto_total) AS total_pedidos,
-        SUM(p.monto_pagado) AS total_pagado,
-        SUM(p.monto_pendiente) AS total_pendiente
-      FROM usuarios u
-      JOIN pedidos p ON u.id = p.usuario_id
-      WHERE u.tipo_usuario = 'cliente'
-      GROUP BY u.id, u.nombre, u.telefono, u.email
-      HAVING SUM(p.monto_pendiente) > 0
-      ORDER BY total_pendiente DESC
+    // Traer todos los pedidos con deuda y sus clientes
+    const pedidosRes = await pool.query(`
+      SELECT p.id AS pedido_id, p.usuario_id AS cliente_id, u.nombre AS cliente_nombre,
+             u.telefono, u.email, p.monto_total, p.monto_pagado, p.monto_pendiente, 
+             p.fecha_creacion
+      FROM pedidos p
+      JOIN usuarios u ON u.id = p.usuario_id AND u.tipo_usuario = 'cliente'
+      WHERE p.monto_pendiente > 0
+      ORDER BY u.id, p.fecha_creacion
     `);
 
-    const clientes = clientesRes.rows;
-    if (!clientes.length) {
-      return res.status(404).send('No hay clientes con deudas pendientes');
+    const pedidos = pedidosRes.rows;
+    if (!pedidos.length) {
+      return res.status(404).send('No hay pedidos con deudas');
     }
 
-    // Construir tabla PDF
-    const tablaClientes = {
-      table: {
-        widths: [40, '*', 80, 120, 80, 80, 80],
-        body: [
-          [
-            { text: 'ID', style: 'tableHeader' },
-            { text: 'Cliente', style: 'tableHeader' },
-            { text: 'Teléfono', style: 'tableHeader' },
-            { text: 'Email', style: 'tableHeader' },
-            { text: 'Total Pedidos', style: 'tableHeader' },
-            { text: 'Pagado', style: 'tableHeader' },
-            { text: 'Pendiente', style: 'tableHeader' }
-          ],
-          ...clientes.map(c => [
-            c.cliente_id.toString(),
-            c.cliente_nombre,
-            c.telefono || '',
-            c.email,
-            `Bs${parseFloat(c.total_pedidos).toFixed(2)}`,
-            `Bs${parseFloat(c.total_pagado).toFixed(2)}`,
-            { text: `Bs${parseFloat(c.total_pendiente).toFixed(2)}`, color: 'red', bold: true }
-          ])
-        ]
-      },
-      layout: 'lightHorizontalLines',
-      margin: [0, 5, 0, 15]
-    };
+    const pedidoIds = pedidos.map(p => p.pedido_id);
 
-    // Totales generales
-    const totalGeneral = clientes.reduce((acc, c) => acc + parseFloat(c.total_pendiente), 0);
+    // Productos por pedido
+    const productosRes = await pool.query(`
+      SELECT pd.pedido_id, pr.nombre AS producto_nombre,
+             pd.cantidad, pd.preciounitario, 
+             (pd.cantidad * pd.preciounitario) AS subtotal
+      FROM pedidoproducto pd
+      JOIN productos pr ON pr.idproducto = pd.producto_id
+      WHERE pd.pedido_id = ANY($1)
+    `, [pedidoIds]);
+
+    const productosMap = {};
+    productosRes.rows.forEach(pd => {
+      if (!productosMap[pd.pedido_id]) productosMap[pd.pedido_id] = [];
+      productosMap[pd.pedido_id].push(pd);
+    });
+
+    let deudaTotalGeneral = 0;
+    const contentClientes = [];
+
+    // Agrupar pedidos por cliente
+    const clientesMap = {};
+    pedidos.forEach(p => {
+      if (!clientesMap[p.cliente_id]) {
+        clientesMap[p.cliente_id] = {
+          cliente_nombre: p.cliente_nombre,
+          telefono: p.telefono,
+          email: p.email,
+          pedidos: []
+        };
+      }
+      clientesMap[p.cliente_id].pedidos.push(p);
+    });
+
+    for (const clienteId in clientesMap) {
+      const cliente = clientesMap[clienteId];
+      let deudaCliente = 0;
+
+      contentClientes.push({ text: `Cliente: ${cliente.cliente_nombre}`, style: 'clienteHeader' });
+      contentClientes.push({ text: `Teléfono: ${cliente.telefono || ''} | Email: ${cliente.email}\n\n`, fontSize: 10 });
+
+      cliente.pedidos.forEach(p => {
+        deudaCliente += parseFloat(p.monto_pendiente);
+        deudaTotalGeneral += parseFloat(p.monto_pendiente);
+
+        const productos = productosMap[p.pedido_id] || [];
+        const productosTable = {
+          table: {
+            widths: ['*', 60, 80, 80],
+            body: [
+              [
+                { text: 'Producto', style: 'tableHeader' },
+                { text: 'Cantidad', style: 'tableHeader' },
+                { text: 'Precio Unitario', style: 'tableHeader' },
+                { text: 'Subtotal', style: 'tableHeader' }
+              ],
+              ...productos.map(pr => [
+                pr.producto_nombre,
+                pr.cantidad.toString(),
+                `Bs${parseFloat(pr.preciounitario).toFixed(2)}`,
+                `Bs${parseFloat(pr.subtotal).toFixed(2)}`
+              ])
+            ]
+          },
+          layout: 'lightHorizontalLines',
+          margin: [0, 5, 0, 10]
+        };
+
+        contentClientes.push({
+          stack: [
+            { text: `Pedido ID: ${p.pedido_id} | Fecha: ${new Date(p.fecha_creacion).toLocaleDateString()}`, style: 'pedidoId' },
+            productosTable,
+            { text: `Total: Bs${parseFloat(p.monto_total).toFixed(2)} | Pagado: Bs${parseFloat(p.monto_pagado).toFixed(2)} | Pendiente: Bs${parseFloat(p.monto_pendiente).toFixed(2)}`, style: 'totalesPedido' },
+            { text: '\n' }
+          ]
+        });
+      });
+
+      contentClientes.push({
+        text: `Deuda Total del Cliente: Bs${deudaCliente.toFixed(2)}\n\n`,
+        style: 'totalesCliente'
+      });
+      contentClientes.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 750, y2: 0, lineWidth: 1, lineColor: '#CCCCCC' }] });
+    }
 
     const docDefinition = {
       pageSize: 'A4',
@@ -78,19 +124,17 @@ router.get('/reporte-deudas-clientes', async (req, res) => {
       content: [
         { text: 'Reporte de Deudas por Cliente', style: 'header', alignment: 'center' },
         { text: `Fecha: ${new Date().toLocaleDateString()}\n\n`, alignment: 'center' },
-        tablaClientes,
-        {
-          text: `Deuda Total General: Bs${totalGeneral.toFixed(2)}`,
-          style: 'totales',
-          alignment: 'right',
-          margin: [0, 20, 0, 0]
-        }
+        ...contentClientes,
+        { text: `\nDEUDA TOTAL GENERAL: Bs${deudaTotalGeneral.toFixed(2)}`, style: 'totalesGeneral', alignment: 'right' }
       ],
       styles: {
         header: { fontSize: 20, bold: true, color: '#2E86C1' },
-        subHeader: { fontSize: 14, italics: true, color: '#555555' },
-        tableHeader: { bold: true, fillColor: '#D6EAF8' },
-        totales: { fontSize: 14, bold: true, color: 'red' }
+        clienteHeader: { fontSize: 14, bold: true, color: '#1F618D', margin: [0, 10, 0, 5] },
+        pedidoId: { fontSize: 10, color: '#555555', margin: [0, 0, 0, 5] },
+        totalesPedido: { fontSize: 10, margin: [0, 2, 0, 5] },
+        totalesCliente: { fontSize: 12, bold: true, color: 'red', margin: [0, 5, 0, 10] },
+        totalesGeneral: { fontSize: 16, bold: true, color: 'red' },
+        tableHeader: { bold: true, fillColor: '#D6EAF8' }
       }
     };
 

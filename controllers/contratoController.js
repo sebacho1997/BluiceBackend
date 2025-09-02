@@ -100,7 +100,7 @@ async asignarConductor(req, res) {
  async marcarEntregado(req, res) {
     const { consumoId } = req.params;
     try {
-      const consumo = await ConsumoModel.marcarEntregado(consumoId);
+      const consumo = await ContratosModel.marcarEntregado(consumoId);
       if (!consumo) {
         return res.status(404).json({ message: 'Consumo no encontrado' });
       }

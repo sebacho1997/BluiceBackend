@@ -110,7 +110,7 @@ const ContratosModel = {
     try {
       const fechaEntrega = new Date().toISOString();
       const result = await pool.query(
-        `UPDATE consumo_detalle
+        `UPDATE consumos_contrato
          SET observaciones = $1,
              fecha_entrega = $2
          WHERE id = $3

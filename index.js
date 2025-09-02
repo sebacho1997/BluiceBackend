@@ -14,6 +14,7 @@ const contratoRoutes = require('./routes/contratoRoutes');
 const reporteMes= require('./models/reporteMes');
 const reportePersonalizado = require('./models/reportePersonalizado');
 const reporteRouter = require('./models/prueba');
+const inventarioConductorRestaRoutes = require('./routes/inventarioConductorRestaRoutes');
 const app = express();
 
 app.use(cors());
@@ -25,6 +26,7 @@ app.use('/api/pedidos', pedidoRoutes);
 app.use('/api/direcciones', direccionRoutes);
 app.use('/api/productos', productoRoutes);
 app.use('/api/inventario', inventarioConductorRoutes); 
+app.use('/api/inventario-resta',inventarioConductorRestaRoutes);
 app.use('/api/pedidoImagenes', pedidoImagenesRoutes);
 app.use('/api/prestamos', prestamoEquipoRoutes);
 app.use('/api/gastos', gastosDiaRoutes);

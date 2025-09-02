@@ -56,6 +56,23 @@ async create(pedidoData) {
     client.release();
   }
 },
+async getClientesDeudores() {
+    try {
+      const query = `
+        SELECT u.id AS usuario_id, u.nombre, u.email
+        FROM usuarios u
+        JOIN pedidos p ON u.id = p.usuario_id
+        WHERE p.monto_pendiente > 0
+        GROUP BY u.id
+        ORDER BY u.nombre
+      `;
+      const result = await pool.query(query);
+      return result.rows;
+    } catch (err) {
+      console.error('Error en ClientesDeudoresModel:', err);
+      throw err;
+    }
+  },
 
   // ================= Agregar pago parcial =================
   async agregarPago(pedido_id, metodo_pago, monto, comprobante, comprobante_id) {

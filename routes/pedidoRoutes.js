@@ -48,5 +48,6 @@ router.put('/:id/entregar', authMiddleware, pedidoController.confirmarEntrega);
 
 router.put('/:id/recibo',authMiddleware, pedidoController.agregarRecibo);
 
+router.get('/deudores',authMiddleware, pedidoController.getClientesDeudores);
 
 module.exports = router;

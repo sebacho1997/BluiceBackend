@@ -57,6 +57,7 @@ async create(pedidoData) {
   }
 },
 async getClientesDeudores() {
+  console.log("entro al model de clientes deudores");
     try {
       const query = `
         SELECT u.id AS usuario_id, u.nombre, u.email
@@ -67,6 +68,7 @@ async getClientesDeudores() {
         ORDER BY u.nombre
       `;
       const result = await pool.query(query);
+      console.log("deudores: "+ result.rows);
       return result.rows;
     } catch (err) {
       console.error('Error en ClientesDeudoresModel:', err);

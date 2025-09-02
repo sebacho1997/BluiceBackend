@@ -106,23 +106,45 @@ const ContratosModel = {
   );
   return result.rows;
 },
- async marcarEntregado(consumoId) {
-    try {
-      const fechaEntrega = new Date().toISOString();
-      const result = await pool.query(
-        `UPDATE consumos_contrato
-         SET observaciones = $1,
-             fecha_entrega = $2
-         WHERE id = $3
-         RETURNING *`,
-        ['entregado', fechaEntrega, consumoId]
-      );
-      return result.rows[0];
-    } catch (err) {
-      console.error('Error en ConsumoModel.marcarEntregado:', err);
-      throw err;
+async marcarEntregado(consumoId) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // 1️⃣ Actualizar el consumo y recuperar el contrato_id
+    const consumoResult = await client.query(
+      `UPDATE consumos_contrato
+       SET observaciones = $1,
+           fecha_entrega = $2
+       WHERE id = $3
+       RETURNING *`,
+      ['entregado', new Date().toISOString(), consumoId]
+    );
+
+    if (consumoResult.rows.length === 0) {
+      throw new Error('Consumo no encontrado');
     }
-  },
+
+    const contratoId = consumoResult.rows[0].contrato_id;
+
+    // 2️⃣ Actualizar estado del contrato a "proceso"
+    await client.query(
+      `UPDATE contratos
+       SET estado = $1
+       WHERE id = $2`,
+      ['proceso', contratoId]
+    );
+
+    await client.query('COMMIT');
+    return consumoResult.rows[0];
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Error en ConsumoModel.marcarEntregado:', err);
+    throw err;
+  } finally {
+    client.release();
+  }
+},
   async createDetalles({ consumo_id, producto_id, cantidad }) {
   const query = `
     INSERT INTO consumo_detalle (consumo_id, producto_id, cantidad)

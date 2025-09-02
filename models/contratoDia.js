@@ -3,8 +3,8 @@ const router = express.Router();
 const PdfPrinter = require('pdfmake');
 const pool = require('../config/db');
 
-router.get('/reporte-consumos-dia/:conductorId', async (req, res) => {
-  const { conductorId } = req.params;
+router.get('/reporte-deudas-cliente/:clienteId', async (req, res) => {
+  const { clienteId } = req.params;
 
   const fonts = {
     Roboto: {
@@ -17,129 +17,109 @@ router.get('/reporte-consumos-dia/:conductorId', async (req, res) => {
   const printer = new PdfPrinter(fonts);
 
   try {
-    // Nombre del conductor
-    const conductorRes = await pool.query(
-      `SELECT nombre FROM usuarios WHERE id = $1 AND tipo_usuario = 'conductor'`,
-      [conductorId]
-    );
-    const conductorNombre = conductorRes.rows.length ? conductorRes.rows[0].nombre : 'Desconocido';
-
-    // Contratos asignados al conductor
-    const contratosRes = await pool.query(
-      `SELECT id AS contrato_id, cliente_id FROM contratos WHERE conductor_id = $1`,
-      [conductorId]
-    );
-    const contratoIds = contratosRes.rows.map(c => c.contrato_id);
-    if (!contratoIds.length) return res.status(404).send('No hay contratos asignados a este conductor');
-
-    // Consumos entregados hoy
-    const consumosRes = await pool.query(
-      `SELECT cc.id AS consumo_id, cc.contrato_id, cc.monto_consumido, cc.fecha_entrega,
-              u.nombre AS cliente_nombre
-       FROM consumos_contrato cc
-       JOIN contratos c ON c.id = cc.contrato_id
-       JOIN usuarios u ON u.id = c.cliente_id
-       WHERE cc.contrato_id = ANY($1)
-         AND cc.fecha_entrega = CURRENT_DATE
-       ORDER BY cc.contrato_id, cc.id`,
-      [contratoIds]
+    // Datos del cliente
+    const clienteRes = await pool.query(
+      `SELECT id, nombre, telefono, email 
+       FROM usuarios 
+       WHERE id = $1 AND tipo_usuario = 'cliente'`,
+      [clienteId]
     );
 
-    const consumos = consumosRes.rows;
-    const consumoIds = consumos.map(c => c.consumo_id);
-    if (!consumoIds.length) return res.status(404).send('No hay consumos entregados hoy');
+    if (!clienteRes.rows.length) {
+      return res.status(404).send('Cliente no encontrado');
+    }
+    const cliente = clienteRes.rows[0];
 
-    // Detalle de productos por consumo
-    const detalleRes = await pool.query(
-      `SELECT cd.consumo_id, p.idproducto AS producto_id, p.nombre AS producto_nombre, cd.cantidad
-       FROM consumo_detalle cd
-       JOIN productos p ON p.idproducto = cd.producto_id
-       WHERE cd.consumo_id = ANY($1)`,
-      [consumoIds]
-    );
+    // Pedidos con deuda de este cliente
+    const pedidosRes = await pool.query(`
+      SELECT p.id AS pedido_id, p.monto_total, p.monto_pagado, 
+             p.monto_pendiente, p.fecha_creacion, p.estado
+      FROM pedidos p
+      WHERE p.usuario_id = $1
+        AND p.monto_pendiente > 0
+      ORDER BY p.fecha_creacion
+    `, [clienteId]);
 
-    const detalleMap = {};
-    detalleRes.rows.forEach(d => {
-      if (!detalleMap[d.consumo_id]) detalleMap[d.consumo_id] = [];
-      detalleMap[d.consumo_id].push(d);
+    const pedidos = pedidosRes.rows;
+    if (!pedidos.length) {
+      return res.status(404).send('Este cliente no tiene pedidos con deudas');
+    }
+
+    const pedidoIds = pedidos.map(p => p.pedido_id);
+
+    // Productos de los pedidos
+    const productosRes = await pool.query(`
+      SELECT pd.pedido_id, pr.nombre AS producto_nombre,
+             pd.cantidad, pd.preciounitario, 
+             (pd.cantidad * pd.preciounitario) AS subtotal
+      FROM pedidoproducto pd
+      JOIN productos pr ON pr.idproducto = pd.producto_id
+      WHERE pd.pedido_id = ANY($1)
+    `, [pedidoIds]);
+
+    const productosMap = {};
+    productosRes.rows.forEach(pd => {
+      if (!productosMap[pd.pedido_id]) productosMap[pd.pedido_id] = [];
+      productosMap[pd.pedido_id].push(pd);
     });
 
-    // Construir contenido del PDF
-    let totalProductos = {};
-    const contentConsumidos = [];
-    let contratoAnterior = null;
+    let deudaCliente = 0;
+    const contentPedidos = [];
 
-    consumos.forEach(c => {
-      // Encabezado para cada contrato nuevo
-      if (c.contrato_id !== contratoAnterior) {
-        contentConsumidos.push({
-          text: `Contrato ID: ${c.contrato_id} | Cliente: ${c.cliente_nombre}`,
-          style: 'contratoHeader',
-          margin: [0, 10, 0, 5]
-        });
-        contratoAnterior = c.contrato_id;
-      }
+    pedidos.forEach(p => {
+      deudaCliente += parseFloat(p.monto_pendiente);
 
-      const detalles = detalleMap[c.consumo_id] || [];
-
-      detalles.forEach(d => {
-        if (!totalProductos[d.producto_nombre]) totalProductos[d.producto_nombre] = 0;
-        totalProductos[d.producto_nombre] += parseInt(d.cantidad);
-      });
-
+      const productos = productosMap[p.pedido_id] || [];
       const productosTable = {
         table: {
-          widths: ['*', 80],
+          widths: ['*', 60, 80, 80],
           body: [
-            [{ text: 'Producto', style: 'tableHeader' }, { text: 'Cantidad', style: 'tableHeader' }],
-            ...detalles.map(d => [d.producto_nombre, d.cantidad.toString()])
+            [
+              { text: 'Producto', style: 'tableHeader' },
+              { text: 'Cantidad', style: 'tableHeader' },
+              { text: 'Precio Unitario', style: 'tableHeader' },
+              { text: 'Subtotal', style: 'tableHeader' }
+            ],
+            ...productos.map(pr => [
+              pr.producto_nombre,
+              pr.cantidad.toString(),
+              `Bs${parseFloat(pr.preciounitario).toFixed(2)}`,
+              `Bs${parseFloat(pr.subtotal).toFixed(2)}`
+            ])
           ]
         },
         layout: 'lightHorizontalLines',
         margin: [0, 5, 0, 10]
       };
 
-      contentConsumidos.push({
+      contentPedidos.push({
         stack: [
-          { text: `Consumo ID: ${c.consumo_id}`, style: 'consumoId' },
+          { text: `Pedido ID: ${p.pedido_id} | Fecha: ${new Date(p.fecha_creacion).toLocaleDateString()} | Estado: ${p.estado}`, style: 'pedidoId' },
           productosTable,
-          { text: `Monto Consumido: Bs${c.monto_consumido}`, style: 'totalesConsumo' },
-          { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 780, y2: 0, lineWidth: 1, lineColor: '#CCCCCC' }], margin: [0, 5, 0, 5] }
+          { text: `Total: Bs${parseFloat(p.monto_total).toFixed(2)} | Pagado: Bs${parseFloat(p.monto_pagado).toFixed(2)} | Pendiente: Bs${parseFloat(p.monto_pendiente).toFixed(2)}`, style: 'totalesPedido' },
+          { text: '\n' }
         ]
       });
     });
-
-    // Tabla resumen de productos totales
-    const resumenTable = {
-      table: {
-        widths: ['*', 80],
-        body: [
-          [{ text: 'Producto', style: 'tableHeader' }, { text: 'Cantidad Total', style: 'tableHeader' }],
-          ...Object.entries(totalProductos).map(([nombre, cant]) => [nombre, cant.toString()])
-        ]
-      },
-      layout: 'lightHorizontalLines',
-      margin: [0, 5, 0, 10]
-    };
 
     const docDefinition = {
       pageSize: 'A4',
       pageOrientation: 'landscape',
       pageMargins: [40, 40, 40, 40],
       content: [
-        { text: 'Reporte Diario de Entregas', style: 'header', alignment: 'center' },
-        { text: `Conductor: ${conductorNombre}`, style: 'subHeader', alignment: 'center' },
+        { text: 'Reporte de Deudas del Cliente', style: 'header', alignment: 'center' },
         { text: `Fecha: ${new Date().toLocaleDateString()}\n\n`, alignment: 'center' },
-        ...contentConsumidos,
-        { text: 'Resumen Total de Productos', style: 'header', margin: [0, 10, 0, 5] },
-        resumenTable
+        { text: `Cliente: ${cliente.nombre}`, style: 'clienteHeader' },
+        { text: `Teléfono: ${cliente.telefono || ''} | Email: ${cliente.email}\n\n`, fontSize: 10 },
+        ...contentPedidos,
+        { text: `\nDEUDA TOTAL DEL CLIENTE: Bs${deudaCliente.toFixed(2)}`, style: 'totalesGeneral', alignment: 'right' }
       ],
       styles: {
         header: { fontSize: 20, bold: true, color: '#2E86C1' },
-        subHeader: { fontSize: 14, italics: true, color: '#555555' },
-        contratoHeader: { fontSize: 14, bold: true, color: '#D35400', margin: [0, 5, 0, 5] },
-        consumoId: { fontSize: 10, color: '#555555', margin: [0, 0, 0, 5] },
-        totalesConsumo: { fontSize: 10, margin: [0, 2, 0, 5] },
+        clienteHeader: { fontSize: 14, bold: true, color: '#1F618D', margin: [0, 10, 0, 5] },
+        pedidoId: { fontSize: 10, color: '#555555', margin: [0, 0, 0, 5] },
+        totalesPedido: { fontSize: 10, margin: [0, 2, 0, 5] },
+        totalesGeneral: { fontSize: 14, bold: true, color: 'red', margin: [0, 5, 0, 10] },
         tableHeader: { bold: true, fillColor: '#D6EAF8' }
       }
     };
@@ -150,14 +130,14 @@ router.get('/reporte-consumos-dia/:conductorId', async (req, res) => {
     pdfDoc.on('end', () => {
       const result = Buffer.concat(chunks);
       res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename=reporte_diario_${conductorNombre}.pdf`);
+      res.setHeader('Content-Disposition', `attachment; filename=reporte_deudas_cliente_${cliente.nombre}.pdf`);
       res.send(result);
     });
     pdfDoc.end();
 
   } catch (err) {
     console.error(err);
-    res.status(500).send('Error generando PDF de consumos del día');
+    res.status(500).send('Error generando reporte de deudas del cliente');
   }
 });
 

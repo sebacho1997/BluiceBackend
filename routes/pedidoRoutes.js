@@ -4,6 +4,7 @@ const pedidoController = require('../controllers/pedidoController');
 const authMiddleware = require('../middleware/authMiddleware');
 const { uploadComprobantes } = require('../middleware/upload'); // <-- importamos el middleware
 
+router.get('/deudores',authMiddleware, pedidoController.getClientesDeudores);
 // Crear un pedido
 router.post('/', authMiddleware, pedidoController.crearPedido);
 
@@ -48,6 +49,5 @@ router.put('/:id/entregar', authMiddleware, pedidoController.confirmarEntrega);
 
 router.put('/:id/recibo',authMiddleware, pedidoController.agregarRecibo);
 
-router.get('/deudores',authMiddleware, pedidoController.getClientesDeudores);
 
 module.exports = router;

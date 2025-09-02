@@ -23,6 +23,19 @@ const InventarioConductorRestaController = {
       res.status(500).json({ message: 'Error en el servidor' });
     }
   },
+  async restarInventarioPedido(req, res) {
+  const { inventarioId, productos } = req.body;
+
+  if (!inventarioId || !productos) {
+    return res.status(400).json({ error: 'Faltan datos' });
+  }
+
+  const exito = await InventarioConductorResta.restarProductos(inventarioId, productos);
+
+  if (exito) return res.json({ mensaje: 'Inventario actualizado correctamente' });
+  return res.status(500).json({ error: 'Error actualizando inventario' });
+},
+
 
   // Verificar si existe inventario hoy
   async existeInventarioHoy(req, res) {

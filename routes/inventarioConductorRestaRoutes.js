@@ -27,4 +27,6 @@ router.put('/inventario-resta', InventarioConductorRestaController.actualizarInv
 // Cerrar inventario
 router.put('/inventario-resta/cerrar/:inventarioId', InventarioConductorRestaController.cerrarInventario);
 
+router.put('/inventario-resta/restar', InventarioConductorRestaController.restarInventarioPedido);
+
 module.exports = router;

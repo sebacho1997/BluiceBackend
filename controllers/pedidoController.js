@@ -275,6 +275,8 @@ async obtenerPedidosAsignados(req, res) {
 },
 
 async updateProductPriceInPedido(req, res) {
+  console.log('entro a actualizar el pedido');
+  console.log(req.body);
   const { pedido_id, producto_id, nuevoPrecio } = req.body;
   try {
     const updated = await Pedido.updateProductPriceInPedido(pedido_id, producto_id, nuevoPrecio);

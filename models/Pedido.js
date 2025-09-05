@@ -57,73 +57,73 @@ async create(pedidoData) {
   }
 },
 
-// async updateProductPriceInPedido(pedido_id, producto_id, nuevoPrecio) {
+ async updateProductPriceInPedido(pedido_id, producto_id, nuevoPrecio) {
+   try {
+     const result = await pool.query(
+       `UPDATE pedidoproducto
+        SET preciounitario = $1
+        WHERE pedido_id = $2 AND producto_id = $3
+        RETURNING *`,
+       [nuevoPrecio, pedido_id, producto_id]
+     );
+     return result.rows[0];
+   } catch (error) {
+     console.error('Error al actualizar precio en pedido:', error);
+     throw new Error('No se pudo actualizar el precio en el pedido');
+   }
+ },
+// async updateTotalPrice(pedido_id, producto_id, nuevoPrecio) {
+//   const client = await pool.connect();
 //   try {
-//     const result = await pool.query(
+//     await client.query('BEGIN');
+
+//     // 1️⃣ Actualizar precio del producto en el pedido
+//     const result = await client.query(
 //       `UPDATE pedidoproducto
 //        SET preciounitario = $1
 //        WHERE pedido_id = $2 AND producto_id = $3
 //        RETURNING *`,
 //       [nuevoPrecio, pedido_id, producto_id]
 //     );
-//     return result.rows[0];
+
+//     if (result.rowCount === 0) {
+//       throw new Error('Producto no encontrado en el pedido');
+//     }
+
+//     // 2️⃣ Recalcular monto_total y monto_pendiente del pedido
+//     const monto = await client.query(
+//       `SELECT SUM(cantidad * preciounitario) AS total
+//        FROM pedidoproducto
+//        WHERE pedido_id = $1`,
+//       [pedido_id]
+//     );
+
+//     const total = monto.rows[0].total || 0;
+
+//     await client.query(
+//       `UPDATE pedidos
+//        SET monto_total = $1,
+//            monto_pendiente = $1 - COALESCE(monto_pagado, 0)
+//        WHERE id = $2`,
+//       [total, pedido_id]
+//     );
+
+//     await client.query('COMMIT');
+
+//     // 3️⃣ Retornar nuevo total y monto pendiente
+//     return {
+//       ...result.rows[0],
+//       monto_total: total,
+//       monto_pendiente: total // o calcular según monto_pagado si quieres
+//     };
 //   } catch (error) {
+//     await client.query('ROLLBACK');
 //     console.error('Error al actualizar precio en pedido:', error);
 //     throw new Error('No se pudo actualizar el precio en el pedido');
+//   } finally {
+//     client.release();
 //   }
 // },
-async updateProductPriceInPedido(pedido_id, producto_id, nuevoPrecio) {
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-
-    // 1️⃣ Actualizar precio del producto en el pedido
-    const result = await client.query(
-      `UPDATE pedidoproducto
-       SET preciounitario = $1
-       WHERE pedido_id = $2 AND producto_id = $3
-       RETURNING *`,
-      [nuevoPrecio, pedido_id, producto_id]
-    );
-
-    if (result.rowCount === 0) {
-      throw new Error('Producto no encontrado en el pedido');
-    }
-
-    // 2️⃣ Recalcular monto_total y monto_pendiente del pedido
-    const monto = await client.query(
-      `SELECT SUM(cantidad * preciounitario) AS total
-       FROM pedidoproducto
-       WHERE pedido_id = $1`,
-      [pedido_id]
-    );
-
-    const total = monto.rows[0].total || 0;
-
-    await client.query(
-      `UPDATE pedidos
-       SET monto_total = $1,
-           monto_pendiente = $1 - COALESCE(monto_pagado, 0)
-       WHERE id = $2`,
-      [total, pedido_id]
-    );
-
-    await client.query('COMMIT');
-
-    // 3️⃣ Retornar nuevo total y monto pendiente
-    return {
-      ...result.rows[0],
-      monto_total: total,
-      monto_pendiente: total // o calcular según monto_pagado si quieres
-    };
-  } catch (error) {
-    await client.query('ROLLBACK');
-    console.error('Error al actualizar precio en pedido:', error);
-    throw new Error('No se pudo actualizar el precio en el pedido');
-  } finally {
-    client.release();
-  }
-},
 
 async getClientesDeudores() {
   console.log("entro al model de clientes deudores");

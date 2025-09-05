@@ -145,8 +145,7 @@ router.get('/reporte-detalle/:conductorId', async (req, res) => {
               ['Total Gastos', `Bs${totalGastos.toString()}`],
               ['Efectivo Neto', `Bs${(totalEfectivo - totalGastos).toString()}`],
               ['Total Ventas', `Bs${totalVentas.toString()}`],
-              ['Pendiente de Cobro', `Bs${pendienteCobro.toString()}`],
-              ['Total Final', `Bs${(totalEfectivo - totalGastos + totalQr + pendienteCobro).toString()}`]
+              ['Pendiente de Cobro', `Bs${pendienteCobro.toString()}`]
             ]
           },
           layout: 'lightHorizontalLines'

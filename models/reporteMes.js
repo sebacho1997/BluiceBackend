@@ -151,8 +151,7 @@ router.get('/reporte-detalle-mes/:conductorId/:mes', async (req, res) => {
               ['Total Gastos', `Bs${totalGastos.toFixed(2)}`],
               ['Efectivo Neto', `Bs${(totalEfectivo - totalGastos).toFixed(2)}`],
               ['Total Ventas', `Bs${totalVentas.toFixed(2)}`],
-              ['Pendiente de Cobro', `Bs${pendienteCobro.toFixed(2)}`],
-              ['Total Final', `Bs${(totalEfectivo - totalGastos + totalQr + pendienteCobro).toFixed(2)}`]
+              ['Pendiente de Cobro', `Bs${pendienteCobro.toFixed(2)}`]
             ]
           },
           layout: 'lightHorizontalLines'

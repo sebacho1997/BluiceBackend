@@ -145,8 +145,7 @@ router.get('/reporte-detalle-personalizado/:conductorId/:startDate/:endDate', as
               ['Total Gastos', `Bs${totalGastos}`],
               ['Efectivo Neto', `Bs${(totalEfectivo - totalGastos)}`],
               ['Total Ventas', `Bs${totalVentas}`],
-              ['Pendiente de Cobro', `Bs${pendienteCobro}`],
-              ['Total Final', `Bs${(totalEfectivo - totalGastos + totalQr + pendienteCobro)}`]
+              ['Pendiente de Cobro', `Bs${pendienteCobro}`]
             ]
           },
           layout: 'lightHorizontalLines'

@@ -3,19 +3,12 @@ const User = require('../models/user');
 const bcrypt = require('bcryptjs');
 const userController = {
   async createUser(req, res) {
-    const hashedPassword='';
     const { nombre, email, contraseña, tipo } = req.body;
     console.log("tipo usuario al crear: "+ req.user.tipo)
     // Solo los administradores pueden crear nuevos usuarios
   
-    if(contraseña!=null)
-    {
-      hashedPassword = await bcrypt.hash(contraseña, 10);
-    }
-    else
-    {
-      hashedPassword=contraseña;
-    }
+
+    const hashedPassword = await bcrypt.hash(contraseña, 10);
     const user = await User.create({ nombre, email, contraseña: hashedPassword, tipo });
     res.status(201).json(user);
   },

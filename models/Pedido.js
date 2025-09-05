@@ -58,6 +58,9 @@ async create(pedidoData) {
 },
 
  async updateProductPriceInPedido(pedido_id, producto_id, nuevoPrecio) {
+  console.log('pedidoid: '+pedido_id);
+  console.log('producto_id: '+producto_id);
+  console.log('nuevoPrecio: '+nuevoPrecio);
    try {
      const result = await pool.query(
        `UPDATE pedidoproducto

@@ -275,8 +275,9 @@ async obtenerPedidosAsignados(req, res) {
 },
 
 async updateProductPriceInPedido(req, res) {
-  console.log('entro a actualizar el pedido');
-  const { pedido_id, producto_id, nuevoPrecio } = req.body;
+ const pedido_id = req.params.pedidoId; // de la URL
+    const producto_id = req.params.pedidoproductoId; // de la URL
+    const nuevoPrecio = req.body.precio; // del JSON que envías desde Flutt
   try {
     console.log('pedido_id: '+ pedido_id);
     console.log('producto_id: '+ producto_id);

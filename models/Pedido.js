@@ -306,7 +306,7 @@ async getPendingWithoutDriver() {
 async getProductosByPedido(pedidoId) {
   try {
     const result = await pool.query(
-      `SELECT pp.cantidad, pp.preciounitario, p.nombre, pp.producto_id
+      `SELECT pp.id AS pedidoproducto_id, pp.cantidad, pp.preciounitario, p.nombre, pp.producto_id
        FROM pedidoproducto pp
        JOIN productos p ON p.idproducto = pp.producto_id
        WHERE pp.pedido_id = $1`,

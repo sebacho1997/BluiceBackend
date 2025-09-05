@@ -49,6 +49,8 @@ router.put('/:id/entregar', authMiddleware, pedidoController.confirmarEntrega);
 
 router.put('/:id/recibo',authMiddleware, pedidoController.agregarRecibo);
 
-router.put('/edit/:productoId/precio', pedidoController.actualizarPrecio);
+// routes/pedidoRoutes.js
+router.put('/edit/:pedidoId/productos/:pedidoproductoId/precio', pedidoController.updateProductPriceInPedido);
+
 
 module.exports = router;

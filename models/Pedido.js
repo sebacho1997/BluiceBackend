@@ -57,26 +57,21 @@ async create(pedidoData) {
   }
 },
 
-async actualizarPrecio(producto_id, nuevoPrecio) {
-    try {
-      const result = await pool.query(
-        `UPDATE productos 
-         SET preciounitario = $1 
-         WHERE idproducto = $2 
-         RETURNING *`,
-        [nuevoPrecio, producto_id]
-      );
-
-      if (result.rows.length === 0) {
-        throw new Error('Producto no encontrado');
-      }
-
-      return result.rows[0];
-    } catch (error) {
-      console.error('Error al actualizar precio:', error);
-      throw new Error('No se pudo actualizar el precio del producto');
-    }
-  },
+async updateProductPriceInPedido(pedido_id, producto_id, nuevoPrecio) {
+  try {
+    const result = await pool.query(
+      `UPDATE pedidoproducto
+       SET preciounitario = $1
+       WHERE pedido_id = $2 AND producto_id = $3
+       RETURNING *`,
+      [nuevoPrecio, pedido_id, producto_id]
+    );
+    return result.rows[0];
+  } catch (error) {
+    console.error('Error al actualizar precio en pedido:', error);
+    throw new Error('No se pudo actualizar el precio en el pedido');
+  }
+},
 
 async getClientesDeudores() {
   console.log("entro al model de clientes deudores");

@@ -274,26 +274,15 @@ async obtenerPedidosAsignados(req, res) {
   }
 },
 
-async actualizarPrecio(req, res) {
-    try {
-      const { productoId } = req.params;
-      const { precio } = req.body;
-
-      if (!precio || isNaN(precio)) {
-        return res.status(400).json({ error: 'El precio es requerido y debe ser numérico' });
-      }
-
-      const productoActualizado = await Producto.actualizarPrecio(productoId, precio);
-
-      res.json({
-        message: 'Precio actualizado correctamente',
-        producto: productoActualizado,
-      });
-    } catch (error) {
-      console.error('Error en productoController.actualizarPrecio:', error);
-      res.status(500).json({ error: 'No se pudo actualizar el precio del producto' });
-    }
-  },
+async updateProductPriceInPedido(req, res) {
+  const { pedido_id, producto_id, nuevoPrecio } = req.body;
+  try {
+    const updated = await Pedido.updateProductPriceInPedido(pedido_id, producto_id, nuevoPrecio);
+    res.json({ success: true, updated });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+},
 
   // Asignar conductor
 async asignarConductor(req, res) {

@@ -12,19 +12,19 @@ const User = {
     }
   },
 
-  async create(userData) {
-    const { nombre,telefono, email, password,activado, tipo_usuario } = userData;
-    try {
-      const result = await pool.query(
-        'INSERT INTO usuarios (nombre,telefono,email, password, activado, tipo_usuario) VALUES ($1, $2, $3, $4,$5,$6) RETURNING *',
-        [nombre,telefono, email, password,activado, tipo_usuario]
-      );
-      return result.rows[0];
-    } catch (error) {
-      console.error('Error al crear usuario:', error);
-      throw new Error('No se pudo crear el usuario');
-    }
-  },
+async create(userData) {
+  const { nombre, telefono, email, password, activado, tipo_usuario } = userData;
+  try {
+    const result = await pool.query(
+      'INSERT INTO usuarios (nombre,telefono,email, password, activado, tipo_usuario) VALUES ($1, $2, $3, $4,$5,$6) RETURNING *',
+      [nombre, telefono, email, password, activado, tipo_usuario]
+    );
+    return result.rows[0];
+  } catch (error) {
+    console.error('Error al crear usuario en Postgres:', error); // 🔹 log real
+    throw new Error('No se pudo crear el usuario');
+  }
+},
 
   async update(id, userData) {
   const { nombre, telefono, email, password, activado, tipo_usuario } = userData;

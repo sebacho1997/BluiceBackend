@@ -8,11 +8,12 @@ const authController = {
     const { nombre, email,telefono, password,activado, tipo_usuario } = req.body;
 
     // Verifica si el email ya existe en la base de datos
-    const existingUser = await User.getByEmail(email);
-    console.log(existingUser);
-    if (existingUser) {
-      return res.status(400).send('El email ya está registrado');
-    }
+   if (email && email.trim() !== '') {
+  const existingUser = await User.getByEmail(email);
+  if (existingUser) {
+    return res.status(400).send('El email ya está registrado');
+  }
+}
 
     // Hashea la contraseña antes de almacenarla
     const hashedPassword = await bcrypt.hash(password, 10);

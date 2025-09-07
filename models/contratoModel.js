@@ -82,12 +82,12 @@ const ContratosModel = {
   return result.rows;
 },
 
-  async createConsumo({ contrato_id, monto_consumido, observaciones }) {
+  async createConsumo({ contrato_id, monto_consumido, observaciones,direccion_id }) {
     
   const result = await pool.query(
-    `INSERT INTO consumos_contrato (contrato_id, monto_consumido, observaciones)
-     VALUES ($1, $2, $3) RETURNING *`,
-    [contrato_id, monto_consumido, "creado"]
+    `INSERT INTO consumos_contrato (contrato_id, monto_consumido, observaciones,direccion_id)
+     VALUES ($1, $2, $3,$4) RETURNING *`,
+    [contrato_id, monto_consumido, "creado",direccion_id]
   );
 
     // restar monto_restante del contrato

@@ -15,7 +15,7 @@ const ContratosController = {
     const { id } = req.params;
 
     try {
-      const contrato = await Contrato.getById(id);
+      const contrato = await ContratosModel.getById(id);
       if (!contrato) {
         return res.status(404).json({ message: 'Contrato no encontrado' });
       }

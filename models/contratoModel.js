@@ -13,9 +13,18 @@ const ContratosModel = {
     return result.rows;
   },
 
-  async getContratoById(id) {
-    const result = await pool.query('SELECT * FROM contratos WHERE id = $1', [id]);
-    return result.rows[0];
+   async getById(contratoId) {
+    try {
+      const query = 'SELECT * FROM contratos WHERE id = $1';
+      const values = [contratoId];
+      const result = await pool.query(query, values);
+
+      if (result.rows.length === 0) return null;
+      return result.rows[0];
+    } catch (error) {
+      console.error('Error en Contrato.getById:', error);
+      throw error;
+    }
   },
 
   async createContrato({ cliente_id, monto_total, monto_restante, fecha_inicio, fecha_fin, estado, conductor_id }) {

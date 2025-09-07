@@ -4,7 +4,7 @@ const ContratosController = require("../controllers/contratoController");
 
 // === CONTRATOS ===
 router.get('/', ContratosController.getAll);
-router.get('/:id', ContratosController.getById);
+router.get('/:id', ContratosController.getContratoById);
 router.post('/', ContratosController.create);
 router.put('/:id', ContratosController.update);
 router.delete('/:id', ContratosController.remove);

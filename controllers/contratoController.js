@@ -11,12 +11,18 @@ const ContratosController = {
     }
   },
 
-  async getById(req, res) {
+  async getContratoById(req, res) {
+    const { id } = req.params;
+
     try {
-      const contrato = await ContratosModel.getContratoById(req.params.id);
+      const contrato = await Contrato.getById(id);
+      if (!contrato) {
+        return res.status(404).json({ message: 'Contrato no encontrado' });
+      }
       res.json(contrato);
-    } catch (err) {
-      res.status(500).json({ error: err.message });
+    } catch (error) {
+      console.error('Error en getContratoById controller:', error);
+      res.status(500).json({ message: 'Error interno del servidor' });
     }
   },
 

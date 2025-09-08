@@ -3,7 +3,7 @@ const pool = require('../config/db');
 
 const Pedido = {
 async create(pedidoData) {
-  const { usuario_id, direccion_id, direccion, latitud, longitud, info_extra, productos } = pedidoData;
+  const { usuario_id, direccion_id, direccion, latitud, longitud, info_extra, productos,id_conductor } = pedidoData;
   const client = await pool.connect();
 
   try {
@@ -12,10 +12,10 @@ async create(pedidoData) {
     // Insertar pedido con estado pendiente
     const pedidoRes = await client.query(
       `INSERT INTO pedidos 
-       (usuario_id, direccion_id, direccion, latitud, longitud, info_extra, estado, monto_total, monto_pagado, monto_pendiente)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,0,0,0)
+       (usuario_id, direccion_id, direccion, latitud, longitud, info_extra, estado, monto_total, monto_pagado, monto_pendiente,id_conductor)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,0,0,0,$8)
        RETURNING *`,
-      [usuario_id, direccion_id || null, direccion || null, latitud || null, longitud || null, info_extra || null, 'pendiente']
+      [usuario_id, direccion_id || null, direccion || null, latitud || null, longitud || null, info_extra || null, 'pendiente',id_conductor]
     );
 
     const pedido = pedidoRes.rows[0];

@@ -47,7 +47,7 @@ const InventarioConductor = {
       JOIN inventario_conductor_detalle d ON d.inventario_id = ic.id
       JOIN productos p ON p.idproducto = d.producto_id
       WHERE ic.conductor_id = $1
-        AND DATE(ic.fecha_creacion) = CURRENT_DATE AND ic.estado = $2
+        AND ic.estado = $2
       ORDER BY d.id ASC
     `, [conductorId,"creado"]);
     return res.rows; // devuelve un array de {detalle_id, producto_id, producto_nombre, cantidad}

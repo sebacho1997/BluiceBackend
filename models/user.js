@@ -55,7 +55,7 @@ async create(userData) {
 
   async getById(id) {
     try {
-      const result = await pool.query('SELECT id, nombre, email, tipo FROM usuarios WHERE id = $1', [id]);
+      const result = await pool.query('SELECT id, nombre, email, tipo_usuario FROM usuarios WHERE id = $1', [id]);
       return result.rows[0];
     } catch (error) {
       console.error('Error al obtener usuario por ID:', error);

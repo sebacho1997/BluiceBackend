@@ -68,7 +68,7 @@ async obtenerPagos(req, res) {
     const { pedido_id } = req.params;
     const pagos = await Pedido.getPagosByPedido(pedido_id);
     console.log('entro a obtener pagos');
-    console.log(pagos);
+    console.log(pedido_id);
     res.json(pagos);
   } catch (error) {
     console.error('Error al obtener pagos:', error);

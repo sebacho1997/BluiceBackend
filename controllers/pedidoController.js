@@ -64,8 +64,11 @@ const pedidoController = {
 },
 async obtenerPagos(req, res) {
   try {
+    
     const { pedido_id } = req.params;
     const pagos = await Pedido.getPagosByPedido(pedido_id);
+    console.log('entro a obtener pagos');
+    console.log(pagos);
     res.json(pagos);
   } catch (error) {
     console.error('Error al obtener pagos:', error);

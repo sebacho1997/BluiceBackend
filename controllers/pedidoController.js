@@ -196,6 +196,7 @@ async obtenerPedidosAsignados(req, res) {
   try {
     const { conductor_id } = req.params; // ID del conductor desde la URL
     const pedidos = await Pedido.getAssignedOrdersByDriver(conductor_id);
+    console.log("pedidos: "+ pedidos);
     res.json(pedidos);
   } catch (error) {
     console.error('Error al obtener pedidos asignados al conductor:', error);

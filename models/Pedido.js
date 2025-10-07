@@ -439,6 +439,7 @@ async getAssignedOrdersByDriver(conductor_id) {
        ORDER BY p.id DESC`,
       [conductor_id]
     );
+    console.log(result.rows);
     return result.rows;
   } catch (error) {
     console.error('Error al obtener pedidos asignados al conductor:', error);

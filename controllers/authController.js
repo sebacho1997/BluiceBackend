@@ -27,7 +27,7 @@ const authController = {
 
   async signup(req, res) {
   const { nombre,telefono, email, password,activado,tipo_usuario } = req.body;
-
+  console.log('entro al signup');
   // Verifica si el email ya existe
   const existingUser = await User.getByEmail(email);
   if (existingUser) {

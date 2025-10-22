@@ -4,26 +4,39 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/user');
 
 const authController = {
-  async register(req, res) {
-    const { nombre, email,telefono, password,activado, tipo_usuario } = req.body;
+async register(req, res) {
+  try {
+    const { nombre, email, telefono, password, activado, tipo_usuario } = req.body;
 
     // Verifica si el email ya existe en la base de datos
-   if (email && email.trim() !== '') {
-  const existingUser = await User.getByEmail(email);
-  if (existingUser) {
-    return res.status(400).send('El email ya está registrado');
-  }
-}
+    if (email && email.trim() !== '') {
+      const existingUser = await User.getByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ error: 'El email ya está registrado' });
+      }
+    }
 
     // Hashea la contraseña antes de almacenarla
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Crea el nuevo usuario
-    const newUser = await User.create({ nombre,telefono, email, password: hashedPassword,activado, tipo_usuario });
-    
-    // Enviar una respuesta de éxito
-    res.status(201).json({ message: 'Usuario registrado con éxito', user: newUser });
-  },
+    const newUser = await User.create({
+      nombre,
+      telefono,
+      email,
+      password: hashedPassword,
+      activado,
+      tipo_usuario
+    });
+
+    // Devuelve directamente el usuario creado
+    res.status(201).json(newUser);
+
+  } catch (error) {
+    console.error('Error en register:', error);
+    res.status(500).json({ error: 'No se pudo crear el usuario' });
+  }
+},
 
   async signup(req, res) {
   const { nombre,telefono, email, password,activado,tipo_usuario } = req.body;

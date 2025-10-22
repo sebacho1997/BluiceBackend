@@ -33,6 +33,7 @@ const ContratosModel = {
        VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
       [cliente_id, monto_total, monto_restante, fecha_inicio, fecha_fin, 'creado', conductor_id]
     );
+    console.log(result.rows[0]);
     return result.rows[0];
   },
   async asignarConductor(id, conductor_id) {

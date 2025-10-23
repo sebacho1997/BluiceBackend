@@ -14,6 +14,7 @@ const InventarioConductorRestaController = {
 
     try {
       const inventario = await InventarioConductorResta.crearInventario(conductorId, productos);
+      console.log(inventario);
       if (inventario) {
         return res.status(201).json(inventario);
       } else {

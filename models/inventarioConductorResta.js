@@ -3,6 +3,7 @@ const pool = require('../config/db');
 const InventarioConductorResta = {
   // Crear inventario resta
   async crearInventario(conductorId, productos) {
+    console.log('entra a crear inventario resta');
     try {
       const res = await pool.query(
         'INSERT INTO inventario_conductor_resta (conductor_id) VALUES ($1) RETURNING id, fecha_creacion',

@@ -13,7 +13,7 @@ router.post('/inventario-resta', InventarioConductorRestaController.crearInventa
 router.get('/inventario-resta/existe/:conductorId', InventarioConductorRestaController.existeInventarioHoy);
 
 // Obtener inventario del día
-router.get('/inventario-resta/hoy/:conductorId', InventarioConductorRestaController.getInventarioHoy);
+router.get('/hoy/:conductorId', InventarioConductorRestaController.getInventarioHoy);
 
 // Obtener todos los inventarios de un conductor
 router.get('/inventario-resta/todos/:conductorId', InventarioConductorRestaController.obtenerInventarios);

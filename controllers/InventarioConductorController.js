@@ -87,6 +87,8 @@ const InventarioConductorController = {
   async cerrarInventario(req, res) {
   try {
     const { inventario_id } = req.body;
+    console.log('controller cerrar inventario, inventario_id: ');
+    console.log(inventario_id);
     if (!inventario_id) return res.status(400).json({ message: 'Falta id del inventario' });
 
     const resultado = await InventarioConductor.cerrarInventario(inventario_id);

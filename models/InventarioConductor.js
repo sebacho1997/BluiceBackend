@@ -84,6 +84,8 @@ const InventarioConductor = {
   },
   async cerrarInventario(inventarioId) {
   try {
+    console.log('entro al model de cerrar inventario con id: ');
+    console.log(inventarioId);
     const res = await pool.query(
       'UPDATE inventario_conductor SET estado = $1 WHERE id = $2 RETURNING *',
       ['cerrado', inventarioId]

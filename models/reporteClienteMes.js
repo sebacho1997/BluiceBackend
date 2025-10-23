@@ -71,8 +71,8 @@ router.get('/reporte-cliente-mes/:clienteId/:mes', async (req, res) => {
     const pagosMap = {};
     pagosRes.rows.forEach(pg => {
       if (!pagosMap[pg.pedido_id]) pagosMap[pg.pedido_id] = { efectivo: 0, qr: 0 };
-      if (pg.metodo_pago.toLowerCase() === 'efectivo') pagosMap[pg.pedido_id].efectivo = parseFloat(pg.total);
-      if (pg.metodo_pago.toLowerCase() === 'qr') pagosMap[pg.pedido_id].qr = parseFloat(pg.total);
+      if (pg.metodo_pago && pg.metodo_pago.toLowerCase() === 'efectivo') pagosMap[pg.pedido_id].efectivo = parseFloat(pg.total) || 0;
+      if (pg.metodo_pago && pg.metodo_pago.toLowerCase() === 'qr') pagosMap[pg.pedido_id].qr = parseFloat(pg.total) || 0;
     });
 
     // 🔢 Totales generales
@@ -81,7 +81,20 @@ router.get('/reporte-cliente-mes/:clienteId/:mes', async (req, res) => {
     const contentPedidos = pedidos.map(p => {
       const productos = productosMap[p.pedido_id] || [];
       const pago = pagosMap[p.pedido_id] || { efectivo: 0, qr: 0 };
-      const totalPedido = productos.reduce((sum, pr) => sum + parseFloat(pr.subtotal), 0);
+
+      const productosConvertidos = productos.map(pr => {
+        const cantidad = Number(pr.cantidad || 0);
+        const precioUnitario = Number(pr.preciounitario || 0);
+        const subtotal = cantidad * precioUnitario;
+        return {
+          producto_nombre: pr.producto_nombre || "Sin nombre",
+          cantidad: cantidad,
+          preciounitario: precioUnitario,
+          subtotal: subtotal
+        };
+      });
+
+      const totalPedido = productosConvertidos.reduce((sum, pr) => sum + pr.subtotal, 0);
       const pendientePedido = Math.max(totalPedido - (pago.efectivo + pago.qr), 0);
 
       totalEfectivo += pago.efectivo;
@@ -99,9 +112,9 @@ router.get('/reporte-cliente-mes/:clienteId/:mes', async (req, res) => {
               { text: 'Precio Unitario', style: 'tableHeader' },
               { text: 'Subtotal', style: 'tableHeader' }
             ],
-            ...productos.map(pr => [
+            ...productosConvertidos.map(pr => [
               pr.producto_nombre,
-              pr.cantidad.toString(),
+              pr.cantidad.toFixed(2),
               `Bs${pr.preciounitario.toFixed(2)}`,
               `Bs${pr.subtotal.toFixed(2)}`
             ])

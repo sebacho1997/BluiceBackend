@@ -53,9 +53,10 @@ const InventarioConductorRestaController = {
   // Obtener inventario del día
   async getInventarioHoy(req, res) {
     const { conductorId } = req.params;
-
+    console.log('conductor id en inventario hoy:'+ conductorId);
     try {
       const inventario = await InventarioConductorResta.getInventarioHoy(conductorId);
+      console.log(inventario);
       return res.json(inventario);
     } catch (error) {
       console.error(error);

@@ -22,6 +22,8 @@ const reporteClienteMes = require('./models/reporteClienteMes');
 const reporteClientePersonalizado = require('./models/reporteClientePersonalizado');
 const contratoPersonalizado = require('./models/contratoPersonalizado')
 const inventarioConductorRestaRoutes = require('./routes/inventarioConductorRestaRoutes');
+const clienteContratoMes=require('./models/clienteContratoMes');
+clienteContratoPersonalizado=require('./models/clienteContratoPersonalizado');
 const app = express();
 
 app.use(cors());
@@ -47,10 +49,14 @@ app.use('/api', contratoDia);
 app.use('/api', contratoMes); 
 app.use('/api', contratoPersonalizado); 
 
+app.use('/api',clienteContratoMes);
+app.use('/api',clienteContratoPersonalizado);
+
+
 app.use('/api', reporteClienteDia); 
 
 app.use('/api',reporteClienteMes);
-app.use('/api',reporteClientePersonalizado );
+app.use('/api',reporteClientePersonalizado);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, "0.0.0.0", () => {

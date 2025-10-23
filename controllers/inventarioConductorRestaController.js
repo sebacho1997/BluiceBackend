@@ -6,6 +6,7 @@ const InventarioConductorRestaController = {
   // Crear inventario
   async crearInventario(req, res) {
     const { conductorId, productos } = req.body;
+    console.log('entro a crear inventario resta');
 
     if (!conductorId || !Array.isArray(productos)) {
       return res.status(400).json({ message: 'Datos incompletos' });

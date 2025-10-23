@@ -23,7 +23,7 @@ const reporteClientePersonalizado = require('./models/reporteClientePersonalizad
 const contratoPersonalizado = require('./models/contratoPersonalizado')
 const inventarioConductorRestaRoutes = require('./routes/inventarioConductorRestaRoutes');
 const clienteContratoMes=require('./models/clienteContratoMes');
-clienteContratoPersonalizado=require('./models/clienteContratoPersonalizado');
+const clienteContratoPersonalizado=require('./models/clienteContratoPersonalizado');
 const app = express();
 
 app.use(cors());

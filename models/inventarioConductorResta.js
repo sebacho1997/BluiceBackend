@@ -105,28 +105,31 @@ const InventarioConductorResta = {
 
   async restarProductos(inventarioId, productos) {
   try {
+    console.log("InventarioId:", inventarioId);
+    console.log("Productos recibidos:", productos);
+
     for (let p of productos) {
-      // Primero revisamos si ya existe el detalle
       const res = await pool.query(
         'SELECT cantidad FROM inventario_conductor_detalle_resta WHERE inventario_id = $1 AND producto_id = $2',
         [inventarioId, p.producto_id]
       );
+      console.log(`Producto ${p.producto_id}, cantidad actual:`, res.rows);
 
       if (res.rows.length > 0) {
         const nuevaCantidad = res.rows[0].cantidad - p.cantidad;
+        console.log(`Restando ${p.cantidad}, nueva cantidad:`, nuevaCantidad < 0 ? 0 : nuevaCantidad);
         await pool.query(
           'UPDATE inventario_conductor_detalle_resta SET cantidad = $1 WHERE inventario_id = $2 AND producto_id = $3',
           [nuevaCantidad < 0 ? 0 : nuevaCantidad, inventarioId, p.producto_id]
         );
       } else {
-        // Si no existía, podemos insertarlo como negativo o ignorar
+        console.log(`Producto no encontrado, insertando negativo:`, p);
         await pool.query(
           'INSERT INTO inventario_conductor_detalle_resta (inventario_id, producto_id, cantidad) VALUES ($1, $2, $3)',
           [inventarioId, p.producto_id, p.cantidad * -1]
         );
       }
     }
-
     return true;
   } catch (error) {
     console.error('Error restando inventario:', error);

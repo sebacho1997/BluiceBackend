@@ -19,7 +19,7 @@ const contratoMes = require('./models/contratoMes');
 const reporteClienteDia= require('./models/ReporteClienteDia');
 
 const reporteClienteMes = require('./models/reporteClienteMes');
-
+const reporteClientePersonalizado = require('./models/reporteClientePersonalizado');
 const contratoPersonalizado = require('./models/contratoPersonalizado')
 const inventarioConductorRestaRoutes = require('./routes/inventarioConductorRestaRoutes');
 const app = express();
@@ -50,6 +50,7 @@ app.use('/api', contratoPersonalizado);
 app.use('/api', reporteClienteDia); 
 
 app.use('/api',reporteClienteMes);
+app.use('/api',reporteClientePersonalizado );
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, "0.0.0.0", () => {

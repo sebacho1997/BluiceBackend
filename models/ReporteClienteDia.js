@@ -17,14 +17,16 @@ router.get('/reporte-deudas-clientes', async (req, res) => {
   try {
     // Traer todos los pedidos con deuda y sus clientes
     const pedidosRes = await pool.query(`
-      SELECT p.id AS pedido_id, p.usuario_id AS cliente_id, u.nombre AS cliente_nombre,
-             u.telefono, u.email, p.monto_total, p.monto_pagado, p.monto_pendiente, 
-             p.fecha_creacion
-      FROM pedidos p
-      JOIN usuarios u ON u.id = p.usuario_id AND u.tipo_usuario = 'cliente'
-      WHERE p.monto_pendiente > 0
-      ORDER BY u.id, p.fecha_creacion
-    `);
+  SELECT p.id AS pedido_id, p.usuario_id AS cliente_id, u.nombre AS cliente_nombre,
+         u.telefono, u.email, p.monto_total, p.monto_pagado, p.monto_pendiente, 
+         p.fecha_creacion, p.estado
+  FROM pedidos p
+  JOIN usuarios u ON u.id = p.usuario_id AND u.tipo_usuario = 'cliente'
+  WHERE p.monto_pendiente > 0
+    AND p.estado = 'entregado'
+  ORDER BY u.id, p.fecha_creacion
+`);
+
 
     const pedidos = pedidosRes.rows;
     if (!pedidos.length) {

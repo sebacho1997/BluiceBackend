@@ -9,6 +9,20 @@ const pedidoController = {
       res.status(201).json(pedido);
     } catch (error) {
       console.error('Error al crear pedido:', error);
+
+      if (error.code === 'STOCK_INSUFICIENTE') {
+        return res.status(400).json({
+          error: 'Stock insuficiente',
+          producto_id: error.producto_id,
+          stock_disponible: error.stock_disponible,
+          cantidad_solicitada: error.cantidad_solicitada
+        });
+      }
+
+      if (error.message === 'Debe enviar al menos un producto' || error.message.includes('Cantidad invalida')) {
+        return res.status(400).json({ error: error.message });
+      }
+
       res.status(500).json({ error: 'No se pudo crear el pedido' });
     }
   },
@@ -315,3 +329,5 @@ async asignarConductor(req, res) {
 };
 
 module.exports = pedidoController;
+
+

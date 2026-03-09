@@ -1,16 +1,25 @@
 const Producto = require('../models/Producto');
-const cloudinary = require('../config/cloudinary'); // Asegúrate de configurar Cloudinary
-const fs = require('fs');
+const cloudinary = require('../config/cloudinary'); // Asegurate de configurar Cloudinary
 
 const productoController = {
   // Crear producto
   async crearProducto(req, res) {
-    console.log(req,res);
     try {
       const { nombre, cantidad, preciounitario } = req.body;
 
-      if (!nombre || !cantidad || !preciounitario) {
-        return res.status(400).json({ mensaje: "Completa todos los campos" });
+      if (!nombre || cantidad === undefined || preciounitario === undefined) {
+        return res.status(400).json({ mensaje: 'Completa todos los campos' });
+      }
+
+      const cantidadNum = Number(cantidad);
+      const precioNum = Number(preciounitario);
+
+      if (!Number.isInteger(cantidadNum) || cantidadNum < 0) {
+        return res.status(400).json({ mensaje: 'La cantidad debe ser un entero mayor o igual a 0' });
+      }
+
+      if (!Number.isFinite(precioNum) || precioNum < 0) {
+        return res.status(400).json({ mensaje: 'El precio unitario debe ser mayor o igual a 0' });
       }
 
       const imageUrl = req.file?.path;
@@ -18,8 +27,8 @@ const productoController = {
 
       const producto = await Producto.create({
         nombre,
-        cantidad,
-        preciounitario,
+        cantidad: cantidadNum,
+        preciounitario: precioNum,
         imagen: imageUrl,
         imagen_id: imageId
       });
@@ -41,10 +50,21 @@ const productoController = {
       const productoActual = await Producto.getById(id);
       if (!productoActual) return res.status(404).json({ mensaje: 'Producto no encontrado' });
 
-      // Mantener valores actuales si no se envían
+      // Mantener valores actuales si no se envian
       const nombreFinal = nombre ?? productoActual.nombre;
       const cantidadFinal = cantidad ?? productoActual.cantidad;
       const preciounitarioFinal = preciounitario ?? productoActual.preciounitario;
+
+      const cantidadNum = Number(cantidadFinal);
+      const precioNum = Number(preciounitarioFinal);
+
+      if (!Number.isInteger(cantidadNum) || cantidadNum < 0) {
+        return res.status(400).json({ mensaje: 'La cantidad debe ser un entero mayor o igual a 0' });
+      }
+
+      if (!Number.isFinite(precioNum) || precioNum < 0) {
+        return res.status(400).json({ mensaje: 'El precio unitario debe ser mayor o igual a 0' });
+      }
 
       let imageUrl = productoActual.imagen;
       let imageId = productoActual.imagen_id;
@@ -60,8 +80,8 @@ const productoController = {
 
       const producto = await Producto.update(id, {
         nombre: nombreFinal,
-        cantidad: cantidadFinal,
-        preciounitario: preciounitarioFinal,
+        cantidad: cantidadNum,
+        preciounitario: precioNum,
         imagen: imageUrl,
         imagen_id: imageId
       });

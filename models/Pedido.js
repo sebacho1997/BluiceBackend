@@ -3,11 +3,15 @@ const pool = require('../config/db');
 
 const Pedido = {
 async create(pedidoData) {
-  const { usuario_id, direccion_id, direccion, latitud, longitud, info_extra,estado, productos,id_conductor } = pedidoData;
+  const { usuario_id, direccion_id, direccion, latitud, longitud, info_extra, estado, productos, id_conductor } = pedidoData;
   const client = await pool.connect();
 
   try {
     await client.query('BEGIN');
+
+    if (!Array.isArray(productos) || productos.length === 0) {
+      throw new Error('Debe enviar al menos un producto');
+    }
 
     // Insertar pedido con estado pendiente
     const pedidoRes = await client.query(
@@ -15,26 +19,51 @@ async create(pedidoData) {
        (usuario_id, direccion_id, direccion, latitud, longitud, info_extra, estado, monto_total, monto_pagado, monto_pendiente,id_conductor)
        VALUES ($1,$2,$3,$4,$5,$6,$7,0,0,0,$8)
        RETURNING *`,
-      [usuario_id, direccion_id || null, direccion || null, latitud || null, longitud || null, info_extra || null, estado,id_conductor]
+      [usuario_id, direccion_id || null, direccion || null, latitud || null, longitud || null, info_extra || null, estado, id_conductor]
     );
 
     const pedido = pedidoRes.rows[0];
     let montoTotal = 0;
 
-    // Insertar productos y calcular monto total
+    // Insertar productos, validar stock y calcular monto total
     for (const prod of productos) {
+      const cantidadSolicitada = Number(prod.cantidad);
+      if (!Number.isInteger(cantidadSolicitada) || cantidadSolicitada <= 0) {
+        throw new Error(`Cantidad invalida para el producto ${prod.producto_id}`);
+      }
+
       const prodRes = await client.query(
-        'SELECT preciounitario FROM productos WHERE idproducto = $1',
+        'SELECT idproducto, cantidad, preciounitario FROM productos WHERE idproducto = $1 FOR UPDATE',
         [prod.producto_id]
       );
-      if (prodRes.rows.length === 0) throw new Error(`Producto con id ${prod.producto_id} no existe`);
-      const precioUnitario = prodRes.rows[0].preciounitario;
-      montoTotal += precioUnitario * prod.cantidad;
+      if (prodRes.rows.length === 0) {
+        throw new Error(`Producto con id ${prod.producto_id} no existe`);
+      }
+
+      const productoDb = prodRes.rows[0];
+      if (Number(productoDb.cantidad) < cantidadSolicitada) {
+        const stockError = new Error(`Stock insuficiente para el producto ${prod.producto_id}`);
+        stockError.code = 'STOCK_INSUFICIENTE';
+        stockError.producto_id = prod.producto_id;
+        stockError.stock_disponible = Number(productoDb.cantidad);
+        stockError.cantidad_solicitada = cantidadSolicitada;
+        throw stockError;
+      }
+
+      const precioUnitario = Number(productoDb.preciounitario);
+      montoTotal += precioUnitario * cantidadSolicitada;
 
       await client.query(
         `INSERT INTO pedidoproducto (pedido_id, producto_id, cantidad, preciounitario)
          VALUES ($1,$2,$3,$4)`,
-        [pedido.id, prod.producto_id, prod.cantidad, precioUnitario]
+        [pedido.id, prod.producto_id, cantidadSolicitada, precioUnitario]
+      );
+
+      await client.query(
+        `UPDATE productos
+         SET cantidad = cantidad - $1
+         WHERE idproducto = $2`,
+        [cantidadSolicitada, prod.producto_id]
       );
     }
 
@@ -51,7 +80,7 @@ async create(pedidoData) {
   } catch (error) {
     await client.query('ROLLBACK');
     console.error('Error al crear pedido:', error);
-    throw new Error('No se pudo crear el pedido');
+    throw error;
   } finally {
     client.release();
   }
@@ -321,15 +350,53 @@ async getPendingWithoutDriver() {
 },
 
   async actualizarEstado(pedido_id, nuevoEstado) {
+    const client = await pool.connect();
     try {
-      const result = await pool.query(
+      await client.query('BEGIN');
+
+      const pedidoRes = await client.query(
+        `SELECT id, estado FROM pedidos WHERE id = $1 FOR UPDATE`,
+        [pedido_id]
+      );
+
+      if (pedidoRes.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return null;
+      }
+
+      const estadoAnterior = pedidoRes.rows[0].estado;
+
+      const result = await client.query(
         `UPDATE pedidos SET estado = $1 WHERE id = $2 RETURNING *`,
         [nuevoEstado, pedido_id]
       );
+
+      if (estadoAnterior !== 'cancelado' && nuevoEstado === 'cancelado') {
+        const detalleRes = await client.query(
+          `SELECT producto_id, cantidad
+           FROM pedidoproducto
+           WHERE pedido_id = $1`,
+          [pedido_id]
+        );
+
+        for (const item of detalleRes.rows) {
+          await client.query(
+            `UPDATE productos
+             SET cantidad = cantidad + $1
+             WHERE idproducto = $2`,
+            [item.cantidad, item.producto_id]
+          );
+        }
+      }
+
+      await client.query('COMMIT');
       return result.rows[0];
     } catch (error) {
+      await client.query('ROLLBACK');
       console.error('Error al actualizar estado del pedido:', error);
       throw new Error('No se pudo actualizar el estado');
+    } finally {
+      client.release();
     }
   },
 
@@ -449,3 +516,4 @@ async getAssignedOrdersByDriver(conductor_id) {
 }; 
 
 module.exports = Pedido;
+

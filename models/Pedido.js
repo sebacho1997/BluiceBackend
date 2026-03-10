@@ -428,7 +428,13 @@ async getPendingWithoutDriver() {
 async getProductosByPedido(pedidoId) {
   try {
     const result = await pool.query(
-      `SELECT pp.id AS pedidoproducto_id, pp.cantidad, pp.preciounitario, p.nombre, pp.producto_id
+      `SELECT pp.id AS pedidoproducto_id,
+              pp.cantidad,
+              COALESCE(pp.cantidad_entregada, 0) AS cantidad_entregada,
+              (pp.cantidad - COALESCE(pp.cantidad_entregada, 0)) AS cantidad_pendiente,
+              pp.preciounitario,
+              p.nombre,
+              pp.producto_id
        FROM pedidoproducto pp
        JOIN productos p ON p.idproducto = pp.producto_id
        WHERE pp.pedido_id = $1`,
@@ -452,35 +458,27 @@ async agregarRecibo(pedido_id, numeroRecibo) {
     return result.rows[0];
   } catch (error) {
     console.error('Error al agregar recibo del pedido:', error);
-    throw new Error('No se pudo agregar el recibo al pedido');
+    throw new Error('No se pudo agregar el recibo del pedido');
   }
 },
 async confirmarEntrega(pedido_id) {
   try {
-    // Obtener el pedido primero
     const pedidoRes = await pool.query(
       `SELECT metodo_pago, comprobante, estado
        FROM pedidos
        WHERE id = $1`,
       [pedido_id]
     );
-
     if (pedidoRes.rows.length === 0) {
       throw new Error('Pedido no encontrado');
     }
-
     const pedido = pedidoRes.rows[0];
-
-    // Verificar si se puede confirmar entrega
     if (pedido.estado === 'entregado') {
       throw new Error('El pedido ya fue entregado');
     }
-
     if (pedido.metodo_pago === 'QR' && !pedido.comprobante) {
       throw new Error('No se puede entregar: falta comprobante QR');
     }
-
-    // Actualizar estado a entregado
     const result = await pool.query(
       `UPDATE pedidos
        SET estado = 'entregado'
@@ -488,9 +486,7 @@ async confirmarEntrega(pedido_id) {
        RETURNING *`,
       [pedido_id]
     );
-
     return result.rows[0];
-
   } catch (error) {
     console.error('Error al confirmar entrega:', error);
     throw new Error('No se pudo confirmar la entrega del pedido');
@@ -512,8 +508,92 @@ async getAssignedOrdersByDriver(conductor_id) {
     console.error('Error al obtener pedidos asignados al conductor:', error);
     throw new Error('No se pudieron obtener los pedidos asignados al conductor');
   }
+},
+
+// Registrar entrega parcial acumulando cantidades entregadas
+async registrarEntregaParcial(pedido_id, entregas) {
+  if (!Array.isArray(entregas) || entregas.length === 0) {
+    throw new Error('Debe enviar productos a entregar');
+  }
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const pedidoRes = await client.query(
+      `SELECT estado FROM pedidos WHERE id = $1 FOR UPDATE`,
+      [pedido_id]
+    );
+    if (pedidoRes.rows.length === 0) {
+      throw new Error('Pedido no encontrado');
+    }
+    if (pedidoRes.rows[0].estado === 'entregado') {
+      throw new Error('El pedido ya fue entregado totalmente');
+    }
+
+    for (const e of entregas) {
+      const cantidadEnt = Number(e.cantidad) ?? 0;
+      if (!Number.isInteger(cantidadEnt) || cantidadEnt <= 0) {
+        throw new Error('Cantidad entregada invalida');
+      }
+
+      const row = await client.query(
+        `SELECT cantidad, COALESCE(cantidad_entregada,0) AS cantidad_entregada
+           FROM pedidoproducto
+          WHERE pedido_id = $1 AND producto_id = $2
+          FOR UPDATE`,
+        [pedido_id, e.producto_id]
+      );
+      if (row.rows.length === 0) {
+        throw new Error(`Producto ${e.producto_id} no existe en el pedido`);
+      }
+
+      const total = Number(row.rows[0].cantidad);
+      const entregadaActual = Number(row.rows[0].cantidad_entregada);
+      const nuevaEntregada = Math.min(total, entregadaActual + cantidadEnt);
+
+      await client.query(
+        `UPDATE pedidoproducto
+            SET cantidad_entregada = $1
+          WHERE pedido_id = $2 AND producto_id = $3`,
+        [nuevaEntregada, pedido_id, e.producto_id]
+      );
+    }
+
+    const pendientesRes = await client.query(
+      `SELECT COUNT(*) AS pendientes
+         FROM pedidoproducto
+        WHERE pedido_id = $1
+          AND COALESCE(cantidad_entregada,0) < cantidad`,
+      [pedido_id]
+    );
+    const pendientes = Number(pendientesRes.rows[0].pendientes);
+
+    if (pendientes === 0) {
+      await client.query(
+        `UPDATE pedidos
+            SET estado = 'entregado',
+                fecha_entrega = NOW()
+          WHERE id = $1`,
+        [pedido_id]
+      );
+    } else {
+      await client.query(
+        `UPDATE pedidos
+            SET estado = 'parcial'
+          WHERE id = $1`,
+        [pedido_id]
+      );
+    }
+
+    await client.query('COMMIT');
+    return { pendientes };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error en entrega parcial:', error);
+    throw new Error(error.message || 'No se pudo registrar la entrega parcial');
+  } finally {
+    client.release();
+  }
 }
-}; 
-
+};
 module.exports = Pedido;
-

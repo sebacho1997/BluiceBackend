@@ -206,6 +206,17 @@ async confirmarEntrega(req, res) {
     res.status(400).json({ error: error.message });
   }
 },
+async registrarEntregaParcial(req, res) {
+  try {
+    const { id } = req.params;
+    const { productos } = req.body;
+    const result = await Pedido.registrarEntregaParcial(parseInt(id), productos);
+    res.json({ success: true, pendientes: result.pendientes });
+  } catch (error) {
+    console.error('Error al registrar entrega parcial:', error);
+    res.status(400).json({ error: error.message });
+  }
+},
 async obtenerPedidosAsignados(req, res) {
   try {
     const { conductor_id } = req.params; // ID del conductor desde la URL

@@ -52,4 +52,6 @@ router.put('/:id/recibo',authMiddleware, pedidoController.agregarRecibo);
 router.put('/edit/:pedidoId/productos/:pedidoproductoId/precio', pedidoController.updateProductPriceInPedido);
 
 
+// Entrega parcial de un pedido
+router.put('/:id/entrega-parcial', authMiddleware, pedidoController.registrarEntregaParcial);
 module.exports = router;

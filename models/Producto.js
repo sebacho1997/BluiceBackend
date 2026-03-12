@@ -10,12 +10,12 @@ const Producto = {
   return result.rows[0];
 },
   async getAll() {
-    const result = await pool.query('SELECT * FROM productos');
+    const result = await pool.query('SELECT * FROM productos WHERE estado = true');
     return result.rows;
   },
 
   async getById(idproducto) {
-    const result = await pool.query('SELECT * FROM productos WHERE idproducto = $1', [idproducto]);
+    const result = await pool.query('SELECT * FROM productos WHERE idproducto = $1 AND estado = true', [idproducto]);
     return result.rows[0];
   },
 
@@ -30,7 +30,7 @@ const Producto = {
 },
 
   async delete(idproducto) {
-    const result = await pool.query('DELETE FROM productos WHERE idproducto = $1', [idproducto]);
+    const result = await pool.query('UPDATE productos SET estado = false WHERE idproducto = $1', [idproducto]);
     return result.rowCount > 0;
   }
 };

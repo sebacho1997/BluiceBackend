@@ -318,9 +318,12 @@ async getOrdersByUserId(usuario_id) {
   async getByEstado(estado) {
   try {
     const result = await pool.query(
-      `SELECT p.*, u.nombre AS usuario_nombre
+      `SELECT p.*,
+              u.nombre AS usuario_nombre,
+              c.nombre AS conductor_nombre
        FROM pedidos p
        JOIN usuarios u ON p.usuario_id = u.id
+       LEFT JOIN usuarios c ON p.id_conductor = c.id
        WHERE p.estado = $1
        ORDER BY p.id DESC`,
       [estado]

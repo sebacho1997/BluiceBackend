@@ -4,14 +4,15 @@ const direccionController = {
   async create(req, res) {
     try {
       const { id } = req.params;  // este es el id del usuario
-      const { direccion, latitud, longitud, info_extra } = req.body;
+      const { direccion, latitud, longitud, info_extra, nombre } = req.body;
 
       const nuevaDireccion = await Direccion.create({
         usuario_id: id,
         direccion,
         latitud,
         longitud,
-        info_extra
+        info_extra,
+        nombre
       });
 
       res.status(201).json(nuevaDireccion);
@@ -47,12 +48,13 @@ const direccionController = {
   async update(req, res) {
     try {
       const { id } = req.params;
-      const { direccion, latitud, longitud, info_extra } = req.body;
+      const { direccion, latitud, longitud, info_extra, nombre } = req.body;
       const direccionActualizada = await Direccion.update(id, {
         direccion,
         latitud,
         longitud,
-        info_extra
+        info_extra,
+        nombre
       });
       if (!direccionActualizada) return res.status(404).json({ error: 'Dirección no encontrada' });
       res.json(direccionActualizada);

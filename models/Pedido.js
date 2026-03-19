@@ -492,6 +492,56 @@ async confirmarEntrega(pedido_id) {
     throw new Error('No se pudo confirmar la entrega del pedido');
   }
 },
+async cancelarYEliminar(pedido_id) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const pedidoRes = await client.query(
+      `SELECT id
+       FROM pedidos
+       WHERE id = $1
+       FOR UPDATE`,
+      [pedido_id]
+    );
+
+    if (pedidoRes.rows.length === 0) {
+      throw new Error('Pedido no encontrado');
+    }
+
+    const detalleRes = await client.query(
+      `SELECT producto_id, cantidad
+       FROM pedidoproducto
+       WHERE pedido_id = $1`,
+      [pedido_id]
+    );
+
+    for (const item of detalleRes.rows) {
+      await client.query(
+        `UPDATE productos
+         SET cantidad = cantidad + $1
+         WHERE idproducto = $2`,
+        [item.cantidad, item.producto_id]
+      );
+    }
+
+    const deleteRes = await client.query(
+      `DELETE FROM pedidos
+       WHERE id = $1
+       RETURNING id`,
+      [pedido_id]
+    );
+
+    await client.query('COMMIT');
+    return deleteRes.rows[0];
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error al cancelar y eliminar pedido:', error);
+    throw new Error(error.message || 'No se pudo cancelar el pedido');
+  } finally {
+    client.release();
+  }
+},
 async getAssignedOrdersByDriver(conductor_id) {
   try {
     const result = await pool.query(

@@ -317,6 +317,17 @@ async updateProductPriceInPedido(req, res) {
   }
 },
 
+async cancelarYEliminar(req, res) {
+  try {
+    const { id } = req.params;
+    const result = await Pedido.cancelarYEliminar(parseInt(id));
+    res.json({ success: true, pedido: result });
+  } catch (error) {
+    console.error('Error al cancelar y eliminar pedido:', error);
+    res.status(400).json({ error: error.message });
+  }
+},
+
   // Asignar conductor
 async asignarConductor(req, res) {
   try {

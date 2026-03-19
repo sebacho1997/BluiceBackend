@@ -47,6 +47,7 @@ router.get('/:pedidoId/productos', authMiddleware, pedidoController.obtenerProdu
 router.put('/:id/entregar', authMiddleware, pedidoController.confirmarEntrega);
 
 router.put('/:id/recibo',authMiddleware, pedidoController.agregarRecibo);
+router.delete('/:id/cancelar', authMiddleware, pedidoController.cancelarYEliminar);
 
 // routes/pedidoRoutes.js
 router.put('/edit/:pedidoId/productos/:pedidoproductoId/precio', pedidoController.updateProductPriceInPedido);

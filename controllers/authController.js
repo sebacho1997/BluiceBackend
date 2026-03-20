@@ -1,14 +1,46 @@
-// controllers/authController.js
 const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
 const User = require('../models/user');
+const RefreshToken = require('../models/refreshToken');
+const {
+  signAccessToken,
+  signRefreshToken,
+  verifyRefreshToken,
+  generateTokenId,
+  hashToken,
+  getRefreshTokenExpiresAt
+} = require('../config/auth');
+
+async function buildAuthResponse(user) {
+  const tokenId = generateTokenId();
+  const accessToken = signAccessToken(user);
+  const refreshToken = signRefreshToken(user, tokenId);
+
+  await RefreshToken.deleteExpired();
+  await RefreshToken.create({
+    userId: user.id,
+    tokenHash: hashToken(refreshToken),
+    jwtId: tokenId,
+    expiresAt: getRefreshTokenExpiresAt()
+  });
+
+  return {
+    token: accessToken,
+    accessToken,
+    refreshToken,
+    usuario: {
+      id: user.id,
+      nombre: user.nombre,
+      email: user.email,
+      rol: user.tipo_usuario
+    }
+  };
+}
 
 const authController = {
   async register(req, res) {
     try {
       const { nombre, email, telefono, password, activado, tipo_usuario } = req.body;
 
-      // Verifica si el email ya existe en la base de datos
       if (email && email.trim() !== '') {
         const existingUser = await User.getByEmail(email);
         if (existingUser) {
@@ -16,10 +48,8 @@ const authController = {
         }
       }
 
-      // Hashea la contrasena antes de almacenarla
       const hashedPassword = await bcrypt.hash(password, 10);
 
-      // Crea el nuevo usuario
       const newUser = await User.create({
         nombre,
         telefono,
@@ -29,7 +59,6 @@ const authController = {
         tipo_usuario
       });
 
-      // Devuelve directamente el usuario creado
       res.status(201).json(newUser);
     } catch (error) {
       console.error('Error en register:', error);
@@ -39,25 +68,21 @@ const authController = {
 
   async signup(req, res) {
     const { nombre, telefono, email, password, activado } = req.body;
-    console.log('entro al signup');
 
-    // Verifica si el email ya existe
     const existingUser = await User.getByEmail(email);
     if (existingUser) {
       return res.status(400).send('El email ya esta registrado');
     }
 
-    // Hashea la contrasena
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Crea el nuevo usuario con tipo 'cliente'
     const newUser = await User.create({
       nombre,
       telefono,
       email,
       password: hashedPassword,
       activado,
-      tipo_usuario: 'cliente' // Forzado como cliente
+      tipo_usuario: 'cliente'
     });
 
     res.status(201).json({
@@ -74,8 +99,10 @@ const authController = {
 
   async login(req, res) {
     const { email } = req.body;
-    const contrasena = req.body.contrasena ?? req.body['contrase�a'] ?? req.body['contraseña'];
-    console.log('lo que se recibe:', req.body);
+    const contrasena =
+      req.body.contrasena ??
+      req.body['contraseña'] ??
+      req.body['contrasena'];
 
     const user = await User.getByEmail(email);
     if (!user) {
@@ -86,30 +113,86 @@ const authController = {
       return res.status(403).send('Usuario desactivado');
     }
 
-    console.log('encontrado pass:', user.password);
-    console.log('comparando', user.password, contrasena);
     const match = await bcrypt.compare(contrasena, user.password);
     if (!match) {
       return res.status(401).send('Contrasena incorrecta');
     }
 
-    const token = jwt.sign(
-      { id: user.id, tipo_usuario: user.tipo_usuario },
-      'tu_clave_secreta',
-      { expiresIn: '1h' }
-    );
+    const authResponse = await buildAuthResponse(user);
+    res.json(authResponse);
+  },
 
-    res.json({
-      token,
-      usuario: {
-        id: user.id,
-        nombre: user.nombre,
-        email: user.email,
-        rol: user.tipo_usuario
+  async refresh(req, res) {
+    try {
+      const refreshToken = req.body.refreshToken;
+
+      if (!refreshToken) {
+        return res.status(400).json({ error: 'Refresh token no proporcionado' });
       }
-    });
 
-    console.log('token es:', token);
+      const payload = verifyRefreshToken(refreshToken);
+      if (payload.type !== 'refresh') {
+        return res.status(403).json({ error: 'Refresh token invalido' });
+      }
+
+      const refreshTokenHash = hashToken(refreshToken);
+      const storedToken = await RefreshToken.findActiveByTokenHash(refreshTokenHash);
+      if (!storedToken) {
+        return res.status(403).json({ error: 'Refresh token revocado o expirado' });
+      }
+
+      if (storedToken.user_id !== payload.id || storedToken.jwt_id !== payload.tokenId) {
+        return res.status(403).json({ error: 'Refresh token invalido' });
+      }
+
+      const user = await User.getByIdWithPassword(payload.id);
+      if (!user || user.activado === false) {
+        await RefreshToken.revokeByTokenHash(refreshTokenHash);
+        return res.status(403).json({ error: 'Usuario no disponible' });
+      }
+
+      const nextTokenId = generateTokenId();
+      const nextAccessToken = signAccessToken(user);
+      const nextRefreshToken = signRefreshToken(user, nextTokenId);
+      const nextRefreshTokenHash = hashToken(nextRefreshToken);
+
+      await RefreshToken.revokeByTokenHash(refreshTokenHash, nextRefreshTokenHash);
+      await RefreshToken.create({
+        userId: user.id,
+        tokenHash: nextRefreshTokenHash,
+        jwtId: nextTokenId,
+        expiresAt: getRefreshTokenExpiresAt()
+      });
+
+      res.json({
+        token: nextAccessToken,
+        accessToken: nextAccessToken,
+        refreshToken: nextRefreshToken,
+        usuario: {
+          id: user.id,
+          nombre: user.nombre,
+          email: user.email,
+          rol: user.tipo_usuario
+        }
+      });
+    } catch (error) {
+      return res.status(403).json({ error: 'Refresh token invalido o expirado' });
+    }
+  },
+
+  async logout(req, res) {
+    const refreshToken = req.body.refreshToken;
+
+    if (refreshToken) {
+      await RefreshToken.revokeByTokenHash(hashToken(refreshToken));
+    }
+
+    res.json({ message: 'Sesion cerrada correctamente' });
+  },
+
+  async logoutAll(req, res) {
+    await RefreshToken.revokeAllByUserId(req.user.id);
+    res.json({ message: 'Todas las sesiones fueron cerradas' });
   }
 };
 

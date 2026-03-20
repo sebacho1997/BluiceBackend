@@ -1,4 +1,3 @@
-// models/User.js
 const pool = require('../config/db');
 
 const User = {
@@ -68,6 +67,19 @@ const User = {
     }
   },
 
+  async getByIdWithPassword(id) {
+    try {
+      const result = await pool.query(
+        'SELECT * FROM usuarios WHERE id = $1 LIMIT 1',
+        [id]
+      );
+      return result.rows[0];
+    } catch (error) {
+      console.error('Error al obtener usuario completo por ID:', error);
+      throw new Error('No se pudo obtener el usuario');
+    }
+  },
+
   async getUsersByType(tipoUsuario) {
     const result = await pool.query(
       'SELECT * FROM usuarios WHERE tipo_usuario = $1 AND activado = true',
@@ -81,7 +93,7 @@ const User = {
       'UPDATE usuarios SET activado = false WHERE id = $1 AND activado = true',
       [id]
     );
-    return result.rowCount > 0; // true si se desactivó el usuario
+    return result.rowCount > 0;
   }
 };
 

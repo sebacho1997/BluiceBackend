@@ -1,175 +1,178 @@
 const express = require('express');
 const router = express.Router();
-const PdfPrinter = require('pdfmake');
 const pool = require('../config/db');
+const {
+  createPrinter,
+  formatCurrency,
+  formatDate,
+  buildSummaryTable,
+  buildDataTable,
+  buildDocDefinition,
+  sectionTitle
+} = require('./reportPdfUtils');
 
-// 📌 Reporte personalizado de pedidos por cliente (rango de fechas)
 router.get('/reporte-cliente-personalizado/:clienteId/:fechaInicio/:fechaFin', async (req, res) => {
   const { clienteId, fechaInicio, fechaFin } = req.params;
+  const printer = createPrinter();
 
-  // Validar formato de fechas YYYY-MM-DD
   if (!/^\d{4}-\d{2}-\d{2}$/.test(fechaInicio) || !/^\d{4}-\d{2}-\d{2}$/.test(fechaFin)) {
-    return res.status(400).send("Las fechas deben estar en formato YYYY-MM-DD");
+    return res.status(400).send('Las fechas deben estar en formato YYYY-MM-DD');
   }
 
-  const fonts = {
-    Roboto: {
-      normal: 'Helvetica',
-      bold: 'Helvetica-Bold',
-      italics: 'Helvetica-Oblique',
-      bolditalics: 'Helvetica-BoldOblique'
-    }
-  };
-  const printer = new PdfPrinter(fonts);
-
   try {
-    // Obtener nombre del cliente
     const clienteRes = await pool.query(
-      `SELECT nombre FROM usuarios WHERE id = $1 AND tipo_usuario = 'cliente'`,
+      `SELECT nombre, telefono, email FROM usuarios WHERE id = $1 AND tipo_usuario = 'cliente'`,
       [clienteId]
     );
-    const clienteNombre = clienteRes.rows.length ? clienteRes.rows[0].nombre : 'Desconocido';
+    const cliente = clienteRes.rows[0];
+    const clienteNombre = cliente ? cliente.nombre : 'Desconocido';
 
-    // 📌 Obtener pedidos del cliente entre las fechas
-    const pedidosRes = await pool.query(`
-      SELECT p.id AS pedido_id, p.monto_total, p.fecha_entrega::date, p.estado,
-             COALESCE(p.monto_pagado, 0) AS monto_pagado,
-             COALESCE(p.monto_pendiente, 0) AS monto_pendiente
-      FROM pedidos p
-      WHERE p.usuario_id = $1
-        AND p.fecha_entrega::date BETWEEN $2::date AND $3::date
-      ORDER BY p.fecha_entrega, p.id
-    `, [clienteId, fechaInicio, fechaFin]);
+    const pedidosRes = await pool.query(
+      `SELECT p.id AS pedido_id, p.fecha_entrega::date AS fecha_entrega, p.estado
+       FROM pedidos p
+       WHERE p.usuario_id = $1
+         AND p.fecha_entrega::date BETWEEN $2::date AND $3::date
+       ORDER BY p.fecha_entrega, p.id`,
+      [clienteId, fechaInicio, fechaFin]
+    );
 
     const pedidos = pedidosRes.rows;
-    const pedidoIds = pedidos.map(p => p.pedido_id);
-    if (!pedidoIds.length) return res.status(404).send(`No hay pedidos del cliente en el rango ${fechaInicio} a ${fechaFin}`);
+    if (!pedidos.length) {
+      return res.status(404).send(`No hay pedidos del cliente en el rango ${fechaInicio} a ${fechaFin}`);
+    }
 
-    // 📦 Productos por pedido
-    const productosRes = await pool.query(`
-      SELECT pd.pedido_id, pr.idproducto AS producto_id, pr.nombre AS producto_nombre,
-             pd.cantidad, pd.preciounitario, (pd.cantidad * pd.preciounitario) AS subtotal
-      FROM pedidoproducto pd
-      JOIN productos pr ON pr.idproducto = pd.producto_id
-      WHERE pd.pedido_id = ANY($1)
-    `, [pedidoIds]);
+    const pedidoIds = pedidos.map((p) => p.pedido_id);
+
+    const productosRes = await pool.query(
+      `SELECT pd.pedido_id, pr.nombre AS producto_nombre, pd.cantidad, pd.preciounitario,
+              (pd.cantidad * pd.preciounitario) AS subtotal
+       FROM pedidoproducto pd
+       JOIN productos pr ON pr.idproducto = pd.producto_id
+       WHERE pd.pedido_id = ANY($1)`,
+      [pedidoIds]
+    );
+
+    const pagosRes = await pool.query(
+      `SELECT pedido_id, metodo_pago, SUM(monto_pagado) AS total
+       FROM pagos_pedido
+       WHERE pedido_id = ANY($1)
+       GROUP BY pedido_id, metodo_pago`,
+      [pedidoIds]
+    );
 
     const productosMap = {};
-    productosRes.rows.forEach(pd => {
-      if (!productosMap[pd.pedido_id]) productosMap[pd.pedido_id] = [];
-      productosMap[pd.pedido_id].push(pd);
-    });
-
-    // 💰 Pagos por pedido
-    const pagosRes = await pool.query(`
-      SELECT pedido_id, metodo_pago, SUM(monto_pagado) AS total
-      FROM pagos_pedido
-      WHERE pedido_id = ANY($1)
-      GROUP BY pedido_id, metodo_pago
-    `, [pedidoIds]);
-
     const pagosMap = {};
-    pagosRes.rows.forEach(pg => {
-      if (!pagosMap[pg.pedido_id]) pagosMap[pg.pedido_id] = { efectivo: 0, qr: 0 };
-      if (pg.metodo_pago && pg.metodo_pago.toLowerCase() === 'efectivo') pagosMap[pg.pedido_id].efectivo = parseFloat(pg.total) || 0;
-      if (pg.metodo_pago && pg.metodo_pago.toLowerCase() === 'qr') pagosMap[pg.pedido_id].qr = parseFloat(pg.total) || 0;
+    const resumenPorDia = {};
+    const topProductos = {};
+
+    productosRes.rows.forEach((row) => {
+      if (!productosMap[row.pedido_id]) productosMap[row.pedido_id] = [];
+      const normalized = {
+        ...row,
+        cantidad: Number(row.cantidad || 0),
+        preciounitario: Number(row.preciounitario || 0),
+        subtotal: Number(row.subtotal || 0)
+      };
+      productosMap[row.pedido_id].push(normalized);
+      topProductos[row.producto_nombre] = (topProductos[row.producto_nombre] || 0) + normalized.cantidad;
     });
 
-    // 🔢 Totales generales
-    let totalEfectivo = 0, totalQr = 0, totalVentas = 0, totalPendiente = 0;
-
-    const contentPedidos = pedidos.map(p => {
-      const productos = productosMap[p.pedido_id] || [];
-      const pago = pagosMap[p.pedido_id] || { efectivo: 0, qr: 0 };
-
-      const productosConvertidos = productos.map(pr => {
-        const cantidad = Number(pr.cantidad || 0);
-        const precioUnitario = Number(pr.preciounitario || 0);
-        const subtotal = cantidad * precioUnitario;
-        return {
-          producto_nombre: pr.producto_nombre || "Sin nombre",
-          cantidad,
-          preciounitario: precioUnitario,
-          subtotal
-        };
-      });
-
-      const totalPedido = productosConvertidos.reduce((sum, pr) => sum + pr.subtotal, 0);
-      const pendientePedido = Math.max(totalPedido - (pago.efectivo + pago.qr), 0);
-
-      totalEfectivo += pago.efectivo;
-      totalQr += pago.qr;
-      totalVentas += totalPedido;
-      totalPendiente += pendientePedido;
-
-      const productosTable = {
-        table: {
-          widths: ['*', 60, 80, 80],
-          body: [
-            [
-              { text: 'Producto', style: 'tableHeader' },
-              { text: 'Cantidad', style: 'tableHeader' },
-              { text: 'Precio Unitario', style: 'tableHeader' },
-              { text: 'Subtotal', style: 'tableHeader' }
-            ],
-            ...productosConvertidos.map(pr => [
-              pr.producto_nombre,
-              pr.cantidad.toFixed(2),
-              `Bs${pr.preciounitario.toFixed(2)}`,
-              `Bs${pr.subtotal.toFixed(2)}`
-            ])
-          ]
-        },
-        layout: 'lightHorizontalLines',
-        margin: [0, 5, 0, 10]
-      };
-
-      return {
-        stack: [
-          { text: `Fecha: ${p.fecha_entrega.toLocaleDateString()} | Pedido ID: ${p.pedido_id}`, style: 'pedidoCliente' },
-          productosTable,
-          { text: `Total: Bs${totalPedido.toFixed(2)} | Efectivo: Bs${pago.efectivo.toFixed(2)} | QR: Bs${pago.qr.toFixed(2)} | Pendiente: Bs${pendientePedido.toFixed(2)}`, style: 'totalesPedido' },
-          { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 780, y2: 0, lineWidth: 1, lineColor: '#CCCCCC' }], margin: [0, 5, 0, 5] }
-        ]
-      };
+    pagosRes.rows.forEach((row) => {
+      if (!pagosMap[row.pedido_id]) pagosMap[row.pedido_id] = { efectivo: 0, qr: 0 };
+      if ((row.metodo_pago || '').toLowerCase() === 'efectivo') pagosMap[row.pedido_id].efectivo = Number(row.total || 0);
+      if ((row.metodo_pago || '').toLowerCase() === 'qr') pagosMap[row.pedido_id].qr = Number(row.total || 0);
     });
 
-    // 📄 Documento PDF
-    const docDefinition = {
-      pageSize: 'A4',
-      pageOrientation: 'landscape',
-      pageMargins: [40, 40, 40, 40],
-      content: [
-        { text: 'Reporte Personalizado de Pedidos del Cliente', style: 'header', alignment: 'center' },
-        { text: `Cliente: ${clienteNombre}`, style: 'subHeader', alignment: 'center' },
-        { text: `Desde: ${fechaInicio} Hasta: ${fechaFin}\n\n`, alignment: 'center' },
-        ...contentPedidos,
-        { text: 'Totales Generales del Rango', style: 'header', margin: [0, 10, 0, 5] },
-        {
-          table: {
-            widths: ['*', 120],
-            body: [
-              ['Total Efectivo', `Bs${totalEfectivo.toFixed(2)}`],
-              ['Total QR', `Bs${totalQr.toFixed(2)}`],
-              ['Total Ventas', `Bs${totalVentas.toFixed(2)}`],
-              ['Pendiente de Pago', `Bs${totalPendiente.toFixed(2)}`]
-            ]
-          },
-          layout: 'lightHorizontalLines'
-        }
-      ],
-      styles: {
-        header: { fontSize: 20, bold: true, color: '#2E86C1' },
-        subHeader: { fontSize: 14, italics: true, color: '#555555' },
-        pedidoCliente: { fontSize: 12, bold: true, color: '#1F618D', margin: [0, 5, 0, 0] },
-        totalesPedido: { fontSize: 10, margin: [0, 2, 0, 5] },
-        tableHeader: { bold: true, fillColor: '#D6EAF8' }
+    const enrichedPedidos = pedidos.map((pedido) => {
+      const productos = productosMap[pedido.pedido_id] || [];
+      const pago = pagosMap[pedido.pedido_id] || { efectivo: 0, qr: 0 };
+      const totalPedido = productos.reduce((sum, producto) => sum + producto.subtotal, 0);
+      const pagado = pago.efectivo + pago.qr;
+      const pendientePedido = Math.max(totalPedido - pagado, 0);
+      const dayKey = pedido.fecha_entrega.toISOString().split('T')[0];
+
+      if (!resumenPorDia[dayKey]) {
+        resumenPorDia[dayKey] = { pedidos: 0, comprado: 0, pagado: 0, pendiente: 0 };
       }
-    };
+      resumenPorDia[dayKey].pedidos += 1;
+      resumenPorDia[dayKey].comprado += totalPedido;
+      resumenPorDia[dayKey].pagado += pagado;
+      resumenPorDia[dayKey].pendiente += pendientePedido;
+
+      return { ...pedido, totalPedido, pagado, pendientePedido };
+    });
+
+    const totalComprado = enrichedPedidos.reduce((sum, pedido) => sum + pedido.totalPedido, 0);
+    const totalPagado = enrichedPedidos.reduce((sum, pedido) => sum + pedido.pagado, 0);
+    const totalPendiente = enrichedPedidos.reduce((sum, pedido) => sum + pedido.pendientePedido, 0);
+    const diasConActividad = Object.keys(resumenPorDia).length;
+    const promedioPedido = totalComprado / enrichedPedidos.length;
+
+    const resumenRows = Object.entries(resumenPorDia)
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([day, data]) => [
+        formatDate(day),
+        String(data.pedidos),
+        formatCurrency(data.comprado),
+        formatCurrency(data.pagado),
+        formatCurrency(data.pendiente)
+      ]);
+
+    const topProductosRows = Object.entries(topProductos)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([producto, cantidad]) => [producto, String(cantidad)]);
+
+    const detalleRows = enrichedPedidos.map((pedido) => [
+      formatDate(pedido.fecha_entrega),
+      `#${pedido.pedido_id}`,
+      pedido.estado,
+      formatCurrency(pedido.totalPedido),
+      formatCurrency(pedido.pagado),
+      formatCurrency(pedido.pendientePedido)
+    ]);
+
+    const docDefinition = buildDocDefinition({
+      title: 'Reporte Personalizado de Cliente',
+      subtitleLines: [
+        `Cliente: ${clienteNombre}`,
+        `Rango: ${fechaInicio} a ${fechaFin}`,
+        cliente ? `Telefono: ${cliente.telefono || '-'} | Email: ${cliente.email || '-'}` : ''
+      ].filter(Boolean),
+      content: [
+        sectionTitle('Resumen del rango'),
+        buildSummaryTable([
+          { label: 'Dias con actividad', value: String(diasConActividad) },
+          { label: 'Pedidos del rango', value: String(enrichedPedidos.length) },
+          { label: 'Monto comprado', value: formatCurrency(totalComprado), tone: 'warning' },
+          { label: 'Monto pagado', value: formatCurrency(totalPagado), tone: 'success' },
+          { label: 'Saldo pendiente', value: formatCurrency(totalPendiente), tone: 'danger' },
+          { label: 'Promedio por pedido', value: formatCurrency(promedioPedido) }
+        ], 3),
+        sectionTitle('Evolucion por fecha'),
+        buildDataTable(
+          ['Fecha', 'Pedidos', 'Comprado', 'Pagado', 'Pendiente'],
+          resumenRows,
+          [75, 60, 95, 95, 95]
+        ),
+        sectionTitle('Productos mas comprados'),
+        buildDataTable(
+          ['Producto', 'Cantidad'],
+          topProductosRows.length ? topProductosRows : [['Sin datos', '-']],
+          ['*', 80]
+        ),
+        sectionTitle('Detalle de pedidos'),
+        buildDataTable(
+          ['Fecha', 'Pedido', 'Estado', 'Total', 'Pagado', 'Pendiente'],
+          detalleRows,
+          [70, 55, 70, 90, 90, 90]
+        )
+      ]
+    });
 
     const pdfDoc = printer.createPdfKitDocument(docDefinition);
-    let chunks = [];
-    pdfDoc.on('data', chunk => chunks.push(chunk));
+    const chunks = [];
+    pdfDoc.on('data', (chunk) => chunks.push(chunk));
     pdfDoc.on('end', () => {
       const result = Buffer.concat(chunks);
       res.setHeader('Content-Type', 'application/pdf');
@@ -177,9 +180,8 @@ router.get('/reporte-cliente-personalizado/:clienteId/:fechaInicio/:fechaFin', a
       res.send(result);
     });
     pdfDoc.end();
-
-  } catch (err) {
-    console.error(err);
+  } catch (error) {
+    console.error(error);
     res.status(500).send('Error generando PDF personalizado del cliente');
   }
 });

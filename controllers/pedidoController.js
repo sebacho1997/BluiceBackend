@@ -317,6 +317,33 @@ async updateProductPriceInPedido(req, res) {
   }
 },
 
+async updateProductCantidadInPedido(req, res) {
+  const pedido_id = Number(req.params.pedidoId);
+  const pedidoproducto_id = Number(req.params.pedidoproductoId);
+  const nuevaCantidad = Number(req.body.cantidad);
+  if (!Number.isInteger(pedido_id) || !Number.isInteger(pedidoproducto_id)) {
+    return res.status(400).json({ success: false, error: 'Identificadores invalidos' });
+  }
+  if (!Number.isInteger(nuevaCantidad) || nuevaCantidad <= 0) {
+    return res.status(400).json({ success: false, error: 'La cantidad debe ser un entero mayor a 0' });
+  }
+  try {
+    const updated = await Pedido.updateProductCantidadInPedido(
+      pedido_id,
+      pedidoproducto_id,
+      nuevaCantidad,
+    );
+    res.json({ success: true, updated });
+  } catch (err) {
+    const status = err.message === 'Producto no encontrado en el pedido'
+      ? 404
+      : err.message === 'Stock insuficiente para actualizar la cantidad'
+        ? 400
+        : 500;
+    res.status(status).json({ success: false, error: err.message });
+  }
+},
+
 async cancelarYEliminar(req, res) {
   try {
     const { id } = req.params;

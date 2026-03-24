@@ -51,6 +51,7 @@ router.delete('/:id/cancelar', authMiddleware, pedidoController.cancelarYElimina
 
 // routes/pedidoRoutes.js
 router.put('/edit/:pedidoId/productos/:pedidoproductoId/precio', pedidoController.updateProductPriceInPedido);
+router.put('/edit/:pedidoId/productos/:pedidoproductoId/cantidad', authMiddleware, pedidoController.updateProductCantidadInPedido);
 
 
 // Entrega parcial de un pedido

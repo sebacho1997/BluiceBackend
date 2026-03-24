@@ -157,6 +157,83 @@ async updateProductPriceInPedido(pedido_id, producto_id, nuevoPrecio) {
   }
 },
 
+async updateProductCantidadInPedido(pedido_id, pedidoproducto_id, nuevaCantidad) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const detalleRes = await client.query(
+      `SELECT pp.id, pp.producto_id, pp.cantidad, pp.preciounitario, p.cantidad AS stock_actual
+       FROM pedidoproducto pp
+       JOIN productos p ON p.idproducto = pp.producto_id
+       WHERE pp.pedido_id = $1 AND pp.id = $2
+       FOR UPDATE`,
+      [pedido_id, pedidoproducto_id]
+    );
+
+    if (detalleRes.rows.length === 0) {
+      throw new Error('Producto no encontrado en el pedido');
+    }
+
+    const detalle = detalleRes.rows[0];
+    const cantidadActual = Number(detalle.cantidad);
+    const stockActual = Number(detalle.stock_actual);
+    const diferencia = nuevaCantidad - cantidadActual;
+
+    if (diferencia > 0 && stockActual < diferencia) {
+      throw new Error('Stock insuficiente para actualizar la cantidad');
+    }
+
+    await client.query(
+      `UPDATE pedidoproducto
+       SET cantidad = $1
+       WHERE pedido_id = $2 AND id = $3`,
+      [nuevaCantidad, pedido_id, pedidoproducto_id]
+    );
+
+    if (diferencia !== 0) {
+      await client.query(
+        `UPDATE productos
+         SET cantidad = cantidad - $1
+         WHERE idproducto = $2`,
+        [diferencia, detalle.producto_id]
+      );
+    }
+
+    const montoRes = await client.query(
+      `SELECT COALESCE(SUM(cantidad * preciounitario), 0) AS total
+       FROM pedidoproducto
+       WHERE pedido_id = $1`,
+      [pedido_id]
+    );
+
+    const total = Number(montoRes.rows[0].total || 0);
+
+    await client.query(
+      `UPDATE pedidos
+       SET monto_total = $1,
+           monto_pendiente = $1 - COALESCE(monto_pagado, 0)
+       WHERE id = $2`,
+      [total, pedido_id]
+    );
+
+    await client.query('COMMIT');
+
+    return {
+      ...detalle,
+      cantidad: nuevaCantidad,
+      monto_total: total,
+      monto_pendiente: total,
+    };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error al actualizar cantidad en pedido:', error);
+    throw error;
+  } finally {
+    client.release();
+  }
+},
+
 async getClientesDeudores() {
   console.log("entro al model de clientes deudores");
     try {

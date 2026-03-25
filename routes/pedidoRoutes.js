@@ -50,7 +50,7 @@ router.put('/:id/recibo',authMiddleware, pedidoController.agregarRecibo);
 router.delete('/:id/cancelar', authMiddleware, pedidoController.cancelarYEliminar);
 
 // routes/pedidoRoutes.js
-router.put('/edit/:pedidoId/productos/:pedidoproductoId/precio', pedidoController.updateProductPriceInPedido);
+router.put('/edit/:pedidoId/productos/:pedidoproductoId/precio', authMiddleware, pedidoController.updateProductPriceInPedido);
 router.put('/edit/:pedidoId/productos/:pedidoproductoId/cantidad', authMiddleware, pedidoController.updateProductCantidadInPedido);
 
 

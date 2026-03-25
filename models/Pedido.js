@@ -86,43 +86,23 @@ async create(pedidoData) {
   }
 },
 
-//  async updateProductPriceInPedido(pedido_id, producto_id, nuevoPrecio) {
-//   console.log('pedidoid: '+pedido_id);
-//   console.log('producto_id: '+producto_id);
-//   console.log('nuevoPrecio: '+nuevoPrecio);
-//    try {
-//      const result = await pool.query(
-//        `UPDATE pedidoproducto
-//         SET preciounitario = $1
-//         WHERE pedido_id = $2 AND producto_id = $3
-//         RETURNING *`,
-//        [nuevoPrecio, pedido_id, producto_id]
-//      );
-//      return result.rows[0];
-//    } catch (error) {
-//      console.error('Error al actualizar precio en pedido:', error);
-//      throw new Error('No se pudo actualizar el precio en el pedido');
-//    }
-//  },
-async updateProductPriceInPedido(pedido_id, producto_id, nuevoPrecio) {
+async updateProductPriceInPedido(pedido_id, pedidoproducto_id, nuevoPrecio) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
-    // 1️⃣ Actualizar precio del producto en el pedido
     const result = await client.query(
       `UPDATE pedidoproducto
        SET preciounitario = $1
-       WHERE pedido_id = $2 AND producto_id = $3
+       WHERE pedido_id = $2 AND id = $3
        RETURNING *`,
-      [nuevoPrecio, pedido_id, producto_id]
+      [nuevoPrecio, pedido_id, pedidoproducto_id]
     );
 
     if (result.rowCount === 0) {
       throw new Error('Producto no encontrado en el pedido');
     }
 
-    // 2️⃣ Recalcular monto_total y monto_pendiente del pedido
     const monto = await client.query(
       `SELECT SUM(cantidad * preciounitario) AS total
        FROM pedidoproducto
@@ -130,7 +110,7 @@ async updateProductPriceInPedido(pedido_id, producto_id, nuevoPrecio) {
       [pedido_id]
     );
 
-    const total = monto.rows[0].total || 0;
+    const total = Number(monto.rows[0].total || 0);
 
     await client.query(
       `UPDATE pedidos
@@ -142,16 +122,15 @@ async updateProductPriceInPedido(pedido_id, producto_id, nuevoPrecio) {
 
     await client.query('COMMIT');
 
-    // 3️⃣ Retornar nuevo total y monto pendiente
     return {
       ...result.rows[0],
       monto_total: total,
-      monto_pendiente: total // o calcular según monto_pagado si quieres
+      monto_pendiente: total,
     };
   } catch (error) {
     await client.query('ROLLBACK');
     console.error('Error al actualizar precio en pedido:', error);
-    throw new Error('No se pudo actualizar el precio en el pedido');
+    throw error;
   } finally {
     client.release();
   }

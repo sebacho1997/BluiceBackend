@@ -303,17 +303,28 @@ async obtenerPedidosAsignados(req, res) {
 },
 
 async updateProductPriceInPedido(req, res) {
- const pedido_id = req.params.pedidoId; // de la URL
-    const producto_id = req.params.pedidoproductoId; // de la URL
-    const nuevoPrecio = req.body.precio; // del JSON que envías desde Flutt
+  const pedido_id = Number(req.params.pedidoId);
+  const pedidoproducto_id = Number(req.params.pedidoproductoId);
+  const nuevoPrecio = Number(req.body.precio);
+
+  if (!Number.isInteger(pedido_id) || !Number.isInteger(pedidoproducto_id)) {
+    return res.status(400).json({ success: false, error: 'Identificadores invalidos' });
+  }
+
+  if (!Number.isFinite(nuevoPrecio) || nuevoPrecio < 0) {
+    return res.status(400).json({ success: false, error: 'El precio debe ser mayor o igual a 0' });
+  }
+
   try {
-    console.log('pedido_id: '+ pedido_id);
-    console.log('producto_id: '+ producto_id);
-    console.log('nuevoPrecio: '+ nuevoPrecio);
-    const updated = await Pedido.updateProductPriceInPedido(pedido_id, producto_id, nuevoPrecio);
+    const updated = await Pedido.updateProductPriceInPedido(
+      pedido_id,
+      pedidoproducto_id,
+      nuevoPrecio,
+    );
     res.json({ success: true, updated });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    const status = err.message === 'Producto no encontrado en el pedido' ? 404 : 500;
+    res.status(status).json({ success: false, error: err.message });
   }
 },
 

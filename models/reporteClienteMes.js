@@ -7,6 +7,7 @@ const {
   formatDate,
   buildSummaryTable,
   buildDataTable,
+  buildOrderDetailBlock,
   buildDocDefinition,
   sectionTitle
 } = require('./reportPdfUtils');
@@ -28,7 +29,8 @@ router.get('/reporte-cliente-mes/:clienteId/:mes', async (req, res) => {
     const clienteNombre = cliente ? cliente.nombre : 'Desconocido';
 
     const pedidosRes = await pool.query(
-      `SELECT p.id AS pedido_id, p.fecha_entrega::date AS fecha_entrega, p.estado
+      `SELECT p.id AS pedido_id, p.nro_pedido, p.fecha_entrega::date AS fecha_entrega,
+              p.estado, p.direccion, p.info_extra
        FROM pedidos p
        WHERE p.usuario_id = $1
          AND TO_CHAR(p.fecha_entrega, 'YYYY-MM') = $2
@@ -78,28 +80,33 @@ router.get('/reporte-cliente-mes/:clienteId/:mes', async (req, res) => {
     });
 
     pagosRes.rows.forEach((row) => {
-      if (!pagosMap[row.pedido_id]) pagosMap[row.pedido_id] = { efectivo: 0, qr: 0 };
-      if ((row.metodo_pago || '').toLowerCase() === 'efectivo') pagosMap[row.pedido_id].efectivo = Number(row.total || 0);
-      if ((row.metodo_pago || '').toLowerCase() === 'qr') pagosMap[row.pedido_id].qr = Number(row.total || 0);
+      if (!pagosMap[row.pedido_id]) pagosMap[row.pedido_id] = { efectivo: 0, qr: 0, rows: [] };
+      const total = Number(row.total || 0);
+      const metodo = (row.metodo_pago || '').toLowerCase();
+      if (metodo === 'efectivo') pagosMap[row.pedido_id].efectivo = total;
+      if (metodo === 'qr') pagosMap[row.pedido_id].qr = total;
+      pagosMap[row.pedido_id].rows.push([row.metodo_pago || 'Sin metodo', formatCurrency(total)]);
     });
 
     const enrichedPedidos = pedidos.map((pedido) => {
       const productos = productosMap[pedido.pedido_id] || [];
-      const pago = pagosMap[pedido.pedido_id] || { efectivo: 0, qr: 0 };
+      const pago = pagosMap[pedido.pedido_id] || { efectivo: 0, qr: 0, rows: [] };
       const totalPedido = productos.reduce((sum, producto) => sum + producto.subtotal, 0);
       const pagado = pago.efectivo + pago.qr;
       const pendientePedido = Math.max(totalPedido - pagado, 0);
       const dayKey = pedido.fecha_entrega.toISOString().split('T')[0];
+      const totalUnidades = productos.reduce((sum, producto) => sum + producto.cantidad, 0);
 
       if (!resumenPorDia[dayKey]) {
-        resumenPorDia[dayKey] = { pedidos: 0, comprado: 0, pagado: 0, pendiente: 0 };
+        resumenPorDia[dayKey] = { pedidos: 0, unidades: 0, comprado: 0, pagado: 0, pendiente: 0 };
       }
       resumenPorDia[dayKey].pedidos += 1;
+      resumenPorDia[dayKey].unidades += totalUnidades;
       resumenPorDia[dayKey].comprado += totalPedido;
       resumenPorDia[dayKey].pagado += pagado;
       resumenPorDia[dayKey].pendiente += pendientePedido;
 
-      return { ...pedido, totalPedido, pagado, pendientePedido };
+      return { ...pedido, totalPedido, pagado, pendientePedido, productos, pago, totalUnidades };
     });
 
     const totalComprado = enrichedPedidos.reduce((sum, pedido) => sum + pedido.totalPedido, 0);
@@ -112,6 +119,7 @@ router.get('/reporte-cliente-mes/:clienteId/:mes', async (req, res) => {
       .map(([day, data]) => [
         formatDate(day),
         String(data.pedidos),
+        String(data.unidades),
         formatCurrency(data.comprado),
         formatCurrency(data.pagado),
         formatCurrency(data.pendiente)
@@ -124,12 +132,52 @@ router.get('/reporte-cliente-mes/:clienteId/:mes', async (req, res) => {
 
     const detalleRows = enrichedPedidos.map((pedido) => [
       formatDate(pedido.fecha_entrega),
-      `#${pedido.pedido_id}`,
+      `#${pedido.nro_pedido || pedido.pedido_id}`,
       pedido.estado,
+      String(pedido.totalUnidades),
       formatCurrency(pedido.totalPedido),
       formatCurrency(pedido.pagado),
       formatCurrency(pedido.pendientePedido)
     ]);
+
+    const pedidosPorDia = enrichedPedidos.reduce((acc, pedido) => {
+      const key = pedido.fecha_entrega.toISOString().split('T')[0];
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(pedido);
+      return acc;
+    }, {});
+
+    const detailContent = [];
+    Object.entries(pedidosPorDia)
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .forEach(([day, pedidosDelDia]) => {
+        detailContent.push(sectionTitle(`Detalle del dia ${formatDate(day)}`));
+        pedidosDelDia.forEach((pedido) => {
+          detailContent.push(
+            buildOrderDetailBlock({
+              title: `Pedido #${pedido.nro_pedido || pedido.pedido_id}`,
+              metaLines: [
+                `Fecha ${formatDate(pedido.fecha_entrega)} | Estado ${pedido.estado || '-'}`,
+                pedido.direccion ? `Direccion: ${pedido.direccion}` : '',
+                pedido.info_extra ? `Referencia: ${pedido.info_extra}` : ''
+              ],
+              productRows: pedido.productos.map((producto) => [
+                producto.producto_nombre,
+                String(producto.cantidad),
+                formatCurrency(producto.preciounitario),
+                formatCurrency(producto.subtotal)
+              ]),
+              paymentRows: pedido.pago.rows,
+              summaryPairs: [
+                { label: 'Items', value: String(pedido.productos.length) },
+                { label: 'Unidades', value: String(pedido.totalUnidades) },
+                { label: 'Pagado', value: formatCurrency(pedido.pagado), style: 'successText' },
+                { label: 'Pendiente', value: formatCurrency(pedido.pendientePedido), style: 'dangerText' }
+              ]
+            })
+          );
+        });
+      });
 
     const docDefinition = buildDocDefinition({
       title: 'Reporte Mensual de Cliente',
@@ -149,9 +197,9 @@ router.get('/reporte-cliente-mes/:clienteId/:mes', async (req, res) => {
         ], 3),
         sectionTitle('Resumen por fecha'),
         buildDataTable(
-          ['Fecha', 'Pedidos', 'Comprado', 'Pagado', 'Pendiente'],
+          ['Fecha', 'Pedidos', 'Unidades', 'Comprado', 'Pagado', 'Pendiente'],
           resumenRows,
-          [75, 60, 95, 95, 95]
+          [70, 55, 60, 90, 90, 90]
         ),
         sectionTitle('Productos mas comprados'),
         buildDataTable(
@@ -161,10 +209,11 @@ router.get('/reporte-cliente-mes/:clienteId/:mes', async (req, res) => {
         ),
         sectionTitle('Detalle de pedidos'),
         buildDataTable(
-          ['Fecha', 'Pedido', 'Estado', 'Total', 'Pagado', 'Pendiente'],
+          ['Fecha', 'Pedido', 'Estado', 'Unidades', 'Total', 'Pagado', 'Pendiente'],
           detalleRows,
-          [70, 55, 70, 90, 90, 90]
-        )
+          [65, 55, 70, 55, 85, 85, 85]
+        ),
+        ...detailContent
       ]
     });
 

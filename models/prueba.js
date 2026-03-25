@@ -7,6 +7,7 @@ const {
   formatDate,
   buildSummaryTable,
   buildDataTable,
+  buildOrderDetailBlock,
   buildDocDefinition,
   sectionTitle,
   divider
@@ -24,7 +25,8 @@ router.get('/reporte-detalle/:conductorId', async (req, res) => {
     const conductorNombre = conductorRes.rows.length ? conductorRes.rows[0].nombre : 'Desconocido';
 
     const pedidosRes = await pool.query(
-      `SELECT p.id AS pedido_id, u.nombre AS cliente_nombre, p.fecha_entrega::date AS fecha_entrega
+      `SELECT p.id AS pedido_id, p.nro_pedido, p.estado, p.direccion, p.info_extra,
+              u.nombre AS cliente_nombre, p.fecha_entrega::date AS fecha_entrega
        FROM pedidos p
        JOIN usuarios u ON u.id = p.usuario_id AND u.tipo_usuario = 'cliente'
        WHERE p.id_conductor = $1
@@ -84,18 +86,27 @@ router.get('/reporte-detalle/:conductorId', async (req, res) => {
     });
 
     pagosRes.rows.forEach((row) => {
-      if (!pagosMap[row.pedido_id]) pagosMap[row.pedido_id] = { efectivo: 0, qr: 0 };
-      if ((row.metodo_pago || '').toLowerCase() === 'efectivo') pagosMap[row.pedido_id].efectivo = Number(row.total || 0);
-      if ((row.metodo_pago || '').toLowerCase() === 'qr') pagosMap[row.pedido_id].qr = Number(row.total || 0);
+      if (!pagosMap[row.pedido_id]) {
+        pagosMap[row.pedido_id] = { efectivo: 0, qr: 0, rows: [] };
+      }
+      const total = Number(row.total || 0);
+      const metodo = (row.metodo_pago || '').toLowerCase();
+      if (metodo === 'efectivo') pagosMap[row.pedido_id].efectivo = total;
+      if (metodo === 'qr') pagosMap[row.pedido_id].qr = total;
+      pagosMap[row.pedido_id].rows.push([
+        row.metodo_pago || 'Sin metodo',
+        formatCurrency(total)
+      ]);
     });
 
     const enrichedPedidos = pedidos.map((pedido) => {
       const productos = productosMap[pedido.pedido_id] || [];
-      const pago = pagosMap[pedido.pedido_id] || { efectivo: 0, qr: 0 };
+      const pago = pagosMap[pedido.pedido_id] || { efectivo: 0, qr: 0, rows: [] };
       const totalPedido = productos.reduce((sum, producto) => sum + producto.subtotal, 0);
       const pendientePedido = Math.max(totalPedido - (pago.efectivo + pago.qr), 0);
+      const totalUnidades = productos.reduce((sum, producto) => sum + producto.cantidad, 0);
 
-      return { ...pedido, productos, pago, totalPedido, pendientePedido };
+      return { ...pedido, productos, pago, totalPedido, pendientePedido, totalUnidades };
     });
 
     const totalVentas = enrichedPedidos.reduce((sum, pedido) => sum + pedido.totalPedido, 0);
@@ -142,38 +153,29 @@ router.get('/reporte-detalle/:conductorId', async (req, res) => {
     content.push(sectionTitle('Detalle de pedidos'));
 
     enrichedPedidos.forEach((pedido) => {
-      content.push({
-        stack: [
-          { text: pedido.cliente_nombre, style: 'blockTitle' },
-          {
-            text: `Pedido #${pedido.pedido_id} | Fecha ${formatDate(pedido.fecha_entrega)} | Efectivo ${formatCurrency(
-              pedido.pago.efectivo
-            )} | QR ${formatCurrency(pedido.pago.qr)}`,
-            style: 'blockMeta'
-          }
-        ]
-      });
-
       content.push(
-        buildDataTable(
-          ['Producto', 'Cantidad', 'P. Unitario', 'Subtotal'],
-          pedido.productos.map((producto) => [
+        buildOrderDetailBlock({
+          title: `${pedido.cliente_nombre} | Pedido #${pedido.nro_pedido || pedido.pedido_id}`,
+          metaLines: [
+            `Fecha ${formatDate(pedido.fecha_entrega)} | Estado ${pedido.estado || '-'}`,
+            pedido.direccion ? `Direccion: ${pedido.direccion}` : '',
+            pedido.info_extra ? `Referencia: ${pedido.info_extra}` : ''
+          ],
+          productRows: pedido.productos.map((producto) => [
             producto.producto_nombre,
             String(producto.cantidad),
             formatCurrency(producto.preciounitario),
             formatCurrency(producto.subtotal)
           ]),
-          ['*', 70, 90, 90]
-        )
+          paymentRows: pedido.pago.rows,
+          summaryPairs: [
+            { label: 'Items', value: String(pedido.productos.length) },
+            { label: 'Unidades', value: String(pedido.totalUnidades) },
+            { label: 'Total pedido', value: formatCurrency(pedido.totalPedido) },
+            { label: 'Pendiente', value: formatCurrency(pedido.pendientePedido), style: 'dangerText' }
+          ]
+        })
       );
-
-      content.push({
-        columns: [
-          { text: `Total pedido: ${formatCurrency(pedido.totalPedido)}`, style: 'emphasis' },
-          { text: `Pendiente: ${formatCurrency(pedido.pendientePedido)}`, alignment: 'right', style: 'dangerText' }
-        ]
-      });
-      content.push(divider());
     });
 
     const docDefinition = buildDocDefinition({

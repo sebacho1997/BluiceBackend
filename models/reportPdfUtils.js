@@ -90,6 +90,73 @@ function sectionTitle(text) {
   return { text, style: 'sectionTitle', margin: [0, 14, 0, 6] };
 }
 
+function detailSubtitle(text) {
+  return { text, style: 'blockTitle', margin: [0, 8, 0, 2] };
+}
+
+function buildDetailTable(headers, rows, widths) {
+  return buildDataTable(
+    headers,
+    rows && rows.length ? rows : [['Sin datos']],
+    widths
+  );
+}
+
+function buildOrderDetailBlock({
+  title,
+  metaLines = [],
+  productRows = [],
+  paymentRows = [],
+  summaryPairs = []
+}) {
+  const stack = [{ text: title, style: 'blockTitle' }];
+
+  metaLines
+    .filter(Boolean)
+    .forEach((line) => stack.push({ text: line, style: 'blockMeta' }));
+
+  stack.push(
+    buildDataTable(
+      ['Producto', 'Cantidad', 'P. Unitario', 'Subtotal'],
+      productRows.length ? productRows : [['Sin productos', '-', '-', '-']],
+      ['*', 60, 85, 85]
+    )
+  );
+
+  if (paymentRows.length) {
+    stack.push(detailSubtitle('Pagos del pedido'));
+    stack.push(
+      buildDataTable(
+        ['Metodo', 'Monto'],
+        paymentRows,
+        ['*', 100]
+      )
+    );
+  }
+
+  if (summaryPairs.length) {
+    stack.push({
+      columns: summaryPairs.map((item) => ({
+        width: '*',
+        stack: [
+          { text: item.label, style: 'metricLabel' },
+          {
+            text: item.value,
+            style: item.style || 'emphasis',
+            alignment: item.align || 'left',
+            margin: [0, 2, 0, 0]
+          }
+        ],
+        margin: [0, 0, 6, 0]
+      })),
+      margin: [0, 2, 0, 0]
+    });
+  }
+
+  stack.push(divider());
+  return { stack };
+}
+
 function divider() {
   return {
     canvas: [{ type: 'line', x1: 0, y1: 0, x2: 760, y2: 0, lineWidth: 1, lineColor: '#D9E2EC' }],
@@ -144,7 +211,10 @@ module.exports = {
   formatDate,
   buildSummaryTable,
   buildDataTable,
+  buildDetailTable,
+  buildOrderDetailBlock,
   buildDocDefinition,
   sectionTitle,
+  detailSubtitle,
   divider
 };

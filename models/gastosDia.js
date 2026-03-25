@@ -16,6 +16,7 @@ async listarHoyConductor(idConductor) {
      JOIN usuarios u ON u.id = g.id_conductor
      WHERE DATE(fecha_gasto) = CURRENT_DATE
        AND g.id_conductor = $1
+       AND COALESCE(u.su, false) = false
      ORDER BY fecha_gasto DESC`,
     [idConductor]
   );
@@ -27,6 +28,7 @@ async listarHoyConductor(idConductor) {
      FROM gastos_dia g
      JOIN usuarios u ON u.id = g.id_conductor
      WHERE g.id_conductor = $1
+       AND COALESCE(u.su, false) = false
      ORDER BY g.fecha_gasto DESC`,
     [idConductor]
   );
@@ -38,7 +40,8 @@ async listarHoyConductor(idConductor) {
       `SELECT g.*, u.nombre AS conductor_nombre
        FROM gastos_dia g
        JOIN usuarios u ON u.id = g.id_conductor
-       WHERE g.id = $1`,
+       WHERE g.id = $1
+         AND COALESCE(u.su, false) = false`,
       [id]
     );
     return result.rows[0];

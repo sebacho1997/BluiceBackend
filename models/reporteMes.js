@@ -31,6 +31,7 @@ router.get('/reporte-detalle-mes/:conductorId/:mes', async (req, res) => {
        FROM pedidos p
        JOIN usuarios u ON u.id = p.usuario_id AND u.tipo_usuario = 'cliente'
        WHERE p.id_conductor = $1
+         AND COALESCE(u.su, false) = false
          AND p.estado IN ('entregado', 'completado')
          AND TO_CHAR(p.fecha_entrega, 'YYYY-MM') = $2
        ORDER BY p.fecha_entrega, p.id`,

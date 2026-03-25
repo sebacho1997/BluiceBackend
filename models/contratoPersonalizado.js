@@ -40,6 +40,7 @@ router.get('/reporte-consumos-personalizado/:conductorId/:fechaInicio/:fechaFin'
        JOIN contratos c ON c.id = cc.contrato_id
        JOIN usuarios u ON u.id = c.cliente_id
        WHERE cc.contrato_id = ANY($1)
+         AND COALESCE(u.su, false) = false
          AND cc.fecha_entrega BETWEEN $2 AND $3
        ORDER BY cc.contrato_id, cc.fecha_entrega, cc.id`,
       [contratoIds, fechaInicio, fechaFin]

@@ -23,6 +23,7 @@ router.get('/reporte-deudas-clientes', async (req, res) => {
   FROM pedidos p
   JOIN usuarios u ON u.id = p.usuario_id AND u.tipo_usuario = 'cliente'
   WHERE p.monto_pendiente > 0
+    AND COALESCE(u.su, false) = false
     AND p.estado = 'entregado'
   ORDER BY u.id, p.fecha_creacion
 `);

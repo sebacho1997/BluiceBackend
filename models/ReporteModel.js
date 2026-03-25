@@ -16,6 +16,7 @@ class ReporteModel {
       FROM pedidos p
       JOIN usuarios u ON u.id = p.usuario_id AND u.tipo_usuario = 'cliente'
       WHERE p.id_conductor = $1
+        AND COALESCE(u.su, false) = false
         AND p.estado IN ('entregado','completado')
         AND p.fecha_entrega::date = CURRENT_DATE
       ORDER BY p.id

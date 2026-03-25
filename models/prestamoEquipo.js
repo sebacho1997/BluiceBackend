@@ -25,6 +25,7 @@ const PrestamoEquipo = {
       `SELECT pe.*, u.nombre AS cliente_nombre
        FROM prestamo_equipo pe
        JOIN usuarios u ON u.id = pe.id_cliente
+       WHERE COALESCE(u.su, false) = false
        ORDER BY pe.id DESC`
     );
     return result.rows;
@@ -35,7 +36,8 @@ const PrestamoEquipo = {
       `SELECT pe.*, u.nombre AS cliente_nombre
        FROM prestamo_equipo pe
        JOIN usuarios u ON u.id = pe.id_cliente
-       WHERE pe.id = $1`,
+       WHERE pe.id = $1
+         AND COALESCE(u.su, false) = false`,
       [id]
     );
     return result.rows[0];

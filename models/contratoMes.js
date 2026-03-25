@@ -40,6 +40,7 @@ router.get('/reporte-consumos-mes/:conductorId/:anio/:mes', async (req, res) => 
        JOIN contratos c ON c.id = cc.contrato_id
        JOIN usuarios u ON u.id = c.cliente_id
        WHERE cc.contrato_id = ANY($1)
+         AND COALESCE(u.su, false) = false
          AND EXTRACT(YEAR FROM cc.fecha_entrega) = $2
          AND EXTRACT(MONTH FROM cc.fecha_entrega) = $3
        ORDER BY cc.contrato_id, cc.id`,

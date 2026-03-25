@@ -45,7 +45,10 @@ const User = {
   async getAll() {
     try {
       const result = await pool.query(
-        'SELECT id, nombre,telefono, email, tipo_usuario FROM usuarios WHERE activado = true'
+        `SELECT id, nombre, telefono, email, tipo_usuario
+         FROM usuarios
+         WHERE activado = true
+           AND COALESCE(su, false) = false`
       );
       return result.rows;
     } catch (error) {
@@ -57,7 +60,11 @@ const User = {
   async getById(id) {
     try {
       const result = await pool.query(
-        'SELECT id, nombre,telefono, email, tipo_usuario FROM usuarios WHERE id = $1 AND activado = true',
+        `SELECT id, nombre, telefono, email, tipo_usuario
+         FROM usuarios
+         WHERE id = $1
+           AND activado = true
+           AND COALESCE(su, false) = false`,
         [id]
       );
       return result.rows[0];
@@ -82,7 +89,11 @@ const User = {
 
   async getUsersByType(tipoUsuario) {
     const result = await pool.query(
-      'SELECT * FROM usuarios WHERE tipo_usuario = $1 AND activado = true',
+      `SELECT *
+       FROM usuarios
+       WHERE tipo_usuario = $1
+         AND activado = true
+         AND COALESCE(su, false) = false`,
       [tipoUsuario]
     );
     return result.rows;

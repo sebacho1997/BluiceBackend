@@ -221,6 +221,7 @@ async getClientesDeudores() {
         FROM usuarios u
         JOIN pedidos p ON u.id = p.usuario_id
         WHERE p.monto_pendiente > 0
+          AND COALESCE(u.su, false) = false
         GROUP BY u.id
         ORDER BY u.nombre
       `;
@@ -381,6 +382,8 @@ async getOrdersByUserId(usuario_id) {
        JOIN usuarios u ON p.usuario_id = u.id
        LEFT JOIN usuarios c ON p.id_conductor = c.id
        WHERE p.estado = $1
+         AND COALESCE(u.su, false) = false
+         AND (c.id IS NULL OR COALESCE(c.su, false) = false)
        ORDER BY p.id DESC`,
       [estado]
     );
@@ -399,6 +402,7 @@ async getPendingWithoutDriver() {
        FROM pedidos p
        JOIN usuarios u ON u.id = p.usuario_id
        WHERE p.estado = 'pendiente' AND p.id_conductor IS NULL
+         AND COALESCE(u.su, false) = false
        ORDER BY p.id DESC`
     );
     return result.rows;
@@ -608,6 +612,7 @@ async getAssignedOrdersByDriver(conductor_id) {
        FROM pedidos p
        JOIN usuarios u ON u.id = p.usuario_id
        WHERE p.id_conductor = $1
+         AND COALESCE(u.su, false) = false
        ORDER BY p.id DESC`,
       [conductor_id]
     );

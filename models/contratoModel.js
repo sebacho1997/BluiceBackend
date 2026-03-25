@@ -8,6 +8,7 @@ const ContratosModel = {
     FROM contratos c
     JOIN usuarios u ON u.id = c.cliente_id
     WHERE c.estado != 'finalizado'
+      AND COALESCE(u.su, false) = false
     ORDER BY c.fecha_inicio DESC
   `);
     return result.rows;

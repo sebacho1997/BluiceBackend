@@ -151,6 +151,7 @@ router.get('/reporte-contratos-cliente-mes/:clienteId/:anio/:mes', async (req, r
       res.setHeader(
         'Content-Disposition',
         `attachment; filename=${buildReportFilename({
+          entityType: 'cliente',
           subjectName: clienteNombre,
           reportType: 'mensual',
           reportDate: `${anio}-${String(mes).padStart(2, '0')}`

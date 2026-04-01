@@ -229,6 +229,7 @@ router.get('/reporte-cliente-personalizado/:clienteId/:fechaInicio/:fechaFin', a
       res.setHeader(
         'Content-Disposition',
         `attachment; filename=${buildReportFilename({
+          entityType: 'cliente',
           subjectName: clienteNombre,
           reportType: 'personalizado',
           reportDate: `${fechaInicio}_a_${fechaFin}`

@@ -227,6 +227,7 @@ router.get('/reporte-cliente-mes/:clienteId/:mes', async (req, res) => {
       res.setHeader(
         'Content-Disposition',
         `attachment; filename=${buildReportFilename({
+          entityType: 'cliente',
           subjectName: clienteNombre,
           reportType: 'mensual',
           reportDate: mes

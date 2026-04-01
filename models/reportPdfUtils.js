@@ -22,6 +22,46 @@ function formatDate(value) {
   return new Date(value).toLocaleDateString('es-BO');
 }
 
+function sanitizeFilePart(value) {
+  return String(value || 'sin-nombre')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .replace(/-+/g, '-')
+    .toLowerCase() || 'sin-nombre';
+}
+
+function formatReportDateForFile(value) {
+  if (!value) {
+    return new Date().toISOString().split('T')[0];
+  }
+
+  if (typeof value === 'string' && /^\d{4}-\d{2}$/.test(value)) {
+    return value;
+  }
+
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}(?:_a_\d{4}-\d{2}-\d{2})?$/.test(value)) {
+    return value.replace(/_a_/g, '-a-');
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return sanitizeFilePart(value);
+  }
+
+  return date.toISOString().split('T')[0];
+}
+
+function buildReportFilename({ subjectName, reportType, reportDate, extension = 'pdf' }) {
+  const safeSubjectName = sanitizeFilePart(subjectName);
+  const safeReportType = sanitizeFilePart(reportType);
+  const safeReportDate = formatReportDateForFile(reportDate);
+  const safeExtension = String(extension || 'pdf').replace(/^\.+/, '') || 'pdf';
+
+  return `${safeSubjectName}-${safeReportType}-${safeReportDate}.${safeExtension}`;
+}
+
 function buildSummaryTable(metrics, columns = 3) {
   const rows = [];
 
@@ -209,6 +249,9 @@ module.exports = {
   createPrinter,
   formatCurrency,
   formatDate,
+  sanitizeFilePart,
+  formatReportDateForFile,
+  buildReportFilename,
   buildSummaryTable,
   buildDataTable,
   buildDetailTable,

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const PdfPrinter = require('pdfmake');
 const pool = require('../config/db');
+const { buildReportFilename } = require('./reportPdfUtils');
 
 // 📌 Reporte personalizado de contratos por cliente (rango de fechas)
 router.get('/reporte-contratos-cliente-personalizado/:clienteId/:start/:end', async (req, res) => {
@@ -152,7 +153,14 @@ router.get('/reporte-contratos-cliente-personalizado/:clienteId/:start/:end', as
     pdfDoc.on('end', () => {
       const result = Buffer.concat(chunks);
       res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename=reporte_personalizado_${clienteNombre}_${start}_a_${end}.pdf`);
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename=${buildReportFilename({
+          subjectName: clienteNombre,
+          reportType: 'personalizado',
+          reportDate: `${start}_a_${end}`
+        })}`
+      );
       res.send(result);
     });
     pdfDoc.end();

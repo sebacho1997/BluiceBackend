@@ -1,5 +1,6 @@
 const PdfPrinter = require('pdfmake');
 const ReporteModel = require('../models/ReporteModel');
+const { buildReportFilename } = require('../models/reportPdfUtils');
 
 class ReporteController {
   static async generarReporte(req, res) {
@@ -88,7 +89,14 @@ class ReporteController {
 
       const pdfDoc = printer.createPdfKitDocument(docDefinition);
       res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename=reporte_${conductorNombre}.pdf`);
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename=${buildReportFilename({
+          subjectName: conductorNombre,
+          reportType: 'diario',
+          reportDate: new Date()
+        })}`
+      );
       pdfDoc.pipe(res);
       pdfDoc.end();
 

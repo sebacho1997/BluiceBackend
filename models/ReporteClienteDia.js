@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const PdfPrinter = require('pdfmake');
 const pool = require('../config/db');
+const { buildReportFilename } = require('./reportPdfUtils');
 
 router.get('/reporte-deudas-clientes', async (req, res) => {
   const fonts = {
@@ -147,7 +148,14 @@ router.get('/reporte-deudas-clientes', async (req, res) => {
     pdfDoc.on('end', () => {
       const result = Buffer.concat(chunks);
       res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', 'attachment; filename=reporte_deudas_clientes.pdf');
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename=${buildReportFilename({
+          subjectName: 'clientes',
+          reportType: 'deuda',
+          reportDate: new Date()
+        })}`
+      );
       res.send(result);
     });
     pdfDoc.end();

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const PdfPrinter = require('pdfmake');
 const pool = require('../config/db');
+const { buildReportFilename } = require('./reportPdfUtils');
 
 router.get('/reporte-consumos-personalizado/:conductorId/:fechaInicio/:fechaFin', async (req, res) => {
   const { conductorId, fechaInicio, fechaFin } = req.params; // fechas en formato YYYY-MM-DD
@@ -151,7 +152,14 @@ router.get('/reporte-consumos-personalizado/:conductorId/:fechaInicio/:fechaFin'
     pdfDoc.on('end', () => {
       const result = Buffer.concat(chunks);
       res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename=reporte_personalizado_${conductorNombre}.pdf`);
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename=${buildReportFilename({
+          subjectName: conductorNombre,
+          reportType: 'personalizado',
+          reportDate: `${fechaInicio}_a_${fechaFin}`
+        })}`
+      );
       res.send(result);
     });
     pdfDoc.end();

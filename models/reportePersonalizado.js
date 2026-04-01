@@ -3,6 +3,7 @@ const router = express.Router();
 const pool = require('../config/db');
 const {
   createPrinter,
+  buildReportFilename,
   formatCurrency,
   formatDate,
   buildSummaryTable,
@@ -235,7 +236,14 @@ router.get('/reporte-detalle-personalizado/:conductorId/:startDate/:endDate', as
     pdfDoc.on('end', () => {
       const result = Buffer.concat(chunks);
       res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename=reporte_personalizado_${conductorNombre}.pdf`);
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename=${buildReportFilename({
+          subjectName: conductorNombre,
+          reportType: 'personalizado',
+          reportDate: `${startDate}_a_${endDate}`
+        })}`
+      );
       res.send(result);
     });
     pdfDoc.end();

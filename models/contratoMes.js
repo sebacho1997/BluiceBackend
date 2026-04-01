@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const PdfPrinter = require('pdfmake');
 const pool = require('../config/db');
+const { buildReportFilename } = require('./reportPdfUtils');
 
 router.get('/reporte-consumos-mes/:conductorId/:anio/:mes', async (req, res) => {
   const { conductorId, anio, mes } = req.params; // anio: 2025, mes: 9
@@ -152,7 +153,14 @@ router.get('/reporte-consumos-mes/:conductorId/:anio/:mes', async (req, res) => 
     pdfDoc.on('end', () => {
       const result = Buffer.concat(chunks);
       res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename=reporte_mensual_${conductorNombre}_${mes}_${anio}.pdf`);
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename=${buildReportFilename({
+          subjectName: conductorNombre,
+          reportType: 'mensual',
+          reportDate: `${anio}-${String(mes).padStart(2, '0')}`
+        })}`
+      );
       res.send(result);
     });
     pdfDoc.end();

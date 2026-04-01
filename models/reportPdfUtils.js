@@ -24,12 +24,9 @@ function formatDate(value) {
 
 function sanitizeFilePart(value) {
   return String(value || 'sin-nombre')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-zA-Z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .replace(/-+/g, '-')
-    .toLowerCase() || 'sin-nombre';
+    .replace(/[<>:"/\\|?*\u0000-\u001F]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim() || 'sin-nombre';
 }
 
 function formatReportDateForFile(value) {
@@ -42,7 +39,7 @@ function formatReportDateForFile(value) {
   }
 
   if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}(?:_a_\d{4}-\d{2}-\d{2})?$/.test(value)) {
-    return value.replace(/_a_/g, '-a-');
+    return value.replace(/_a_/g, ' a ');
   }
 
   const date = new Date(value);
@@ -59,7 +56,7 @@ function buildReportFilename({ subjectName, reportType, reportDate, extension = 
   const safeReportDate = formatReportDateForFile(reportDate);
   const safeExtension = String(extension || 'pdf').replace(/^\.+/, '') || 'pdf';
 
-  return `${safeSubjectName}-${safeReportType}-${safeReportDate}.${safeExtension}`;
+  return `"${safeSubjectName}-${safeReportType}-${safeReportDate}.${safeExtension}"`;
 }
 
 function buildSummaryTable(metrics, columns = 3) {

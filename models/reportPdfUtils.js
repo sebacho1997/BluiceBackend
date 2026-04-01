@@ -158,24 +158,43 @@ function buildOrderDetailBlock({
     .filter(Boolean)
     .forEach((line) => stack.push({ text: line, style: 'blockMeta' }));
 
-  stack.push(
-    buildDataTable(
-      ['Producto', 'Cantidad', 'P. Unitario', 'Subtotal'],
-      productRows.length ? productRows : [['Sin productos', '-', '-', '-']],
-      ['*', 60, 85, 85]
-    )
-  );
+  const combinedRows = [];
+
+  if (productRows.length) {
+    combinedRows.push(
+      ...productRows.map((row) => [
+        row[0] ?? '',
+        row[1] ?? '',
+        row[2] ?? '',
+        row[3] ?? '',
+        '',
+        ''
+      ])
+    );
+  } else {
+    combinedRows.push(['Sin productos', '-', '-', '-', '', '']);
+  }
 
   if (paymentRows.length) {
-    stack.push(detailSubtitle('Pagos del pedido'));
-    stack.push(
-      buildDataTable(
-        ['Metodo', 'Monto'],
-        paymentRows,
-        ['*', 100]
-      )
+    combinedRows.push(
+      ...paymentRows.map((row) => [
+        '',
+        '',
+        '',
+        '',
+        row[0] ?? 'Sin metodo',
+        row[1] ?? '-'
+      ])
     );
   }
+
+  stack.push(
+    buildDataTable(
+      ['Producto', 'Cantidad', 'P. Unitario', 'Subtotal', 'Metodo', 'Monto'],
+      combinedRows,
+      ['*', 55, 75, 80, 95, 75]
+    )
+  );
 
   if (summaryPairs.length) {
     stack.push({

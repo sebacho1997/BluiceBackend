@@ -53,6 +53,17 @@ const pedidoController = {
       res.status(500).json({ error: 'Error al obtener clientes deudores' });
     }
   },
+  
+  async marcarPagado(req, res) {
+  try {
+    const { id } = req.params;
+    await Pedido.marcarPagado(parseInt(id));
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "No se pudo marcar el pedido como pagado" });
+  }
+},
+
   async agregarPago(req, res) {
   try {
     const { id } = req.params; // id del pedido

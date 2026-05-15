@@ -24,7 +24,7 @@ async create(pedidoData) {
 
     const pedido = pedidoRes.rows[0];
     let montoTotal = 0;
-
+    
     // Insertar productos, validar stock y calcular monto total
     for (const prod of productos) {
       const cantidadSolicitada = Number(prod.cantidad);
@@ -85,7 +85,14 @@ async create(pedidoData) {
     client.release();
   }
 },
-
+async marcarPagado(pedido_id) {
+  await pool.query(
+    `UPDATE pedidos
+     SET estado='pagado'
+     WHERE id=$1 AND monto_pagado >= monto_total`,
+    [pedido_id]
+  );
+},
 async updateProductPriceInPedido(pedido_id, pedidoproducto_id, nuevoPrecio) {
   const client = await pool.connect();
   try {

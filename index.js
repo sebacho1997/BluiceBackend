@@ -24,6 +24,7 @@ const clienteContratoMes = require('./models/clienteContratoMes');
 const clienteContratoPersonalizado = require('./models/clienteContratoPersonalizado');
 const initAuthTables = require('./config/initAuthTables');
 const reporteGeneral = require('./models/reporteGeneral');
+const reporteComisiones = require('./models/reporteComisiones');
 
 const app = express();
 
@@ -54,6 +55,7 @@ app.use('/api', reporteClienteDia);
 app.use('/api', reporteClienteMes);
 app.use('/api', reporteClientePersonalizado);
 app.use('/api', reporteGeneral);
+app.use('/api', reporteComisiones);
 
 const PORT = process.env.PORT || 5000;
 

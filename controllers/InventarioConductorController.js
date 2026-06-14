@@ -54,7 +54,7 @@ const InventarioConductorController = {
     }
   },
 
-  async obtenerDetalle(req, res) {
+  async obtenerDetalleInventario(req, res) {
     try {
       const { inventario_id } = req.params;
 
@@ -65,7 +65,7 @@ const InventarioConductorController = {
       const detalle = await InventarioConductor.obtenerDetalleInventario(inventario_id);
       res.json(detalle);
     } catch (error) {
-      console.error('Error en obtenerDetalle:', error);
+      console.error('Error en obtenerDetalleInventario:', error);
       res.status(500).json({ message: 'Error del servidor' });
     }
   },
@@ -144,7 +144,7 @@ const InventarioConductorController = {
   },
 
   // Obtener detalle de una devolución
-  async obtenerDetalle(req, res) {
+  async obtenerDetalleDevolucion(req, res) {
     try {
       const { devolucion_id } = req.params;
 
@@ -154,7 +154,7 @@ const InventarioConductorController = {
 
       res.json(detalle);
     } catch (error) {
-      console.error('Error en obtenerDetalle:', error);
+      console.error('Error en obtenerDetalleDevolucion:', error);
       res.status(500).json({ message: 'Error del servidor' });
     }
   }

@@ -73,7 +73,11 @@ const InventarioConductor = {
   async obtenerDetalleInventario(inventarioId) {
     try {
       const res = await pool.query(
-        'SELECT * FROM inventario_conductor_detalle WHERE inventario_id = $1',
+        `SELECT d.id AS detalle_id, d.inventario_id, d.producto_id, p.nombre AS producto_nombre, d.cantidad
+         FROM inventario_conductor_detalle d
+         JOIN productos p ON p.idproducto = d.producto_id
+         WHERE d.inventario_id = $1
+         ORDER BY d.id ASC`,
         [inventarioId]
       );
       return res.rows;

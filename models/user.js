@@ -12,11 +12,11 @@ const User = {
   },
 
   async create(userData) {
-    const { nombre, telefono, email, password, activado, tipo_usuario } = userData;
+    const { nombre, telefono, email, password, activado, tipo_usuario, email_confirm } = userData;
     try {
       const result = await pool.query(
-        'INSERT INTO usuarios (nombre,telefono,email, password, activado, tipo_usuario) VALUES ($1, $2, $3, $4,$5,$6) RETURNING *',
-        [nombre, telefono, email, password, activado, tipo_usuario]
+        'INSERT INTO usuarios (nombre,telefono,email,password,activado,tipo_usuario,email_confirm) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *',
+        [nombre, telefono, email, password, activado, tipo_usuario, email_confirm ?? true]
       );
       return result.rows[0];
     } catch (error) {
@@ -26,7 +26,7 @@ const User = {
   },
 
   async update(id, userData) {
-    const { nombre, telefono, email, password, activado, tipo_usuario } = userData;
+    const { nombre, telefono, email, password, activado, tipo_usuario, email_confirm } = userData;
     const result = await pool.query(
       `UPDATE usuarios
        SET nombre = $1,
@@ -34,10 +34,11 @@ const User = {
            email = $3,
            password = $4,
            activado = $5,
-           tipo_usuario = $6
-       WHERE id = $7
-       RETURNING id, nombre, telefono, email, activado, tipo_usuario`,
-      [nombre, telefono, email, password, activado, tipo_usuario, id]
+           tipo_usuario = $6,
+           email_confirm = $7
+       WHERE id = $8
+       RETURNING id, nombre, telefono, email, activado, tipo_usuario, email_confirm`,
+      [nombre, telefono, email, password, activado, tipo_usuario, email_confirm, id]
     );
     return result.rows[0];
   },
@@ -60,7 +61,7 @@ const User = {
   async getById(id) {
     try {
       const result = await pool.query(
-        `SELECT id, nombre, telefono, email, tipo_usuario
+        `SELECT id, nombre, telefono, email, tipo_usuario, email_confirm
          FROM usuarios
          WHERE id = $1
            AND activado = true
@@ -105,6 +106,22 @@ const User = {
       [id]
     );
     return result.rowCount > 0;
+  },
+
+  async confirmEmail(userId) {
+    const result = await pool.query(
+      'UPDATE usuarios SET email_confirm = true WHERE id = $1 RETURNING id, email_confirm',
+      [userId]
+    );
+    return result.rows[0];
+  },
+
+  async getEmailConfirmStatus(userId) {
+    const result = await pool.query(
+      'SELECT email_confirm FROM usuarios WHERE id = $1',
+      [userId]
+    );
+    return result.rows[0]?.email_confirm ?? false;
   }
 };
 

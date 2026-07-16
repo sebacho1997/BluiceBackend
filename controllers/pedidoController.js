@@ -1,10 +1,24 @@
 // controllers/pedidoController.js
 const Pedido = require('../models/Pedido');
+const pool = require('../config/db');
 
 const pedidoController = {
   // Crear pedido
   async crearPedido(req, res) {
     try {
+      if (req.user && req.user.tipo_usuario === 'cliente') {
+        const result = await pool.query(
+          'SELECT email_confirm FROM usuarios WHERE id = $1',
+          [req.user.id]
+        );
+        const emailConfirm = result.rows[0]?.email_confirm;
+        if (!emailConfirm) {
+          return res.status(403).json({
+            error: 'Debes confirmar tu correo electronico antes de realizar pedidos. Revisa tu bandeja de entrada.'
+          });
+        }
+      }
+
       const pedido = await Pedido.create(req.body);
       res.status(201).json(pedido);
     } catch (error) {

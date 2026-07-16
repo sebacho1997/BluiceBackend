@@ -23,6 +23,27 @@ async function initAuthTables() {
     CREATE INDEX IF NOT EXISTS idx_refresh_tokens_expires_at
     ON refresh_tokens(expires_at)
   `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS email_confirm_tokens (
+      id BIGSERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+      token VARCHAR(64) NOT NULL UNIQUE,
+      expires_at TIMESTAMPTZ NOT NULL,
+      used_at TIMESTAMPTZ NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_email_confirm_tokens_user_id
+    ON email_confirm_tokens(user_id)
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_email_confirm_tokens_token
+    ON email_confirm_tokens(token)
+  `);
 }
 
 module.exports = initAuthTables;

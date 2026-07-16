@@ -1,6 +1,9 @@
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const User = require('../models/user');
 const RefreshToken = require('../models/refreshToken');
+const pool = require('../config/db');
+const { sendConfirmationEmail } = require('../config/email');
 const {
   signAccessToken,
   signRefreshToken,
@@ -31,7 +34,8 @@ async function buildAuthResponse(user) {
       id: user.id,
       nombre: user.nombre,
       email: user.email,
-      rol: user.tipo_usuario
+      rol: user.tipo_usuario,
+      email_confirm: user.email_confirm ?? true
     }
   };
 }
@@ -82,19 +86,65 @@ const authController = {
       email,
       password: hashedPassword,
       activado,
-      tipo_usuario: 'cliente'
+      tipo_usuario: 'cliente',
+      email_confirm: false
     });
 
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    await pool.query(
+      'INSERT INTO email_confirm_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)',
+      [newUser.id, token, expiresAt]
+    );
+
+    await sendConfirmationEmail(email, nombre, token);
+
     res.status(201).json({
-      message: 'Cliente registrado con exito',
+      message: 'Cliente registrado con exito. Revisa tu correo para confirmar tu cuenta.',
       user: {
         id: newUser.id,
         nombre: newUser.nombre,
         telefono: newUser.telefono,
         email: newUser.email,
-        tipo_usuario: newUser.tipo_usuario
+        tipo_usuario: newUser.tipo_usuario,
+        email_confirm: false
       }
     });
+  },
+
+  async confirmEmail(req, res) {
+    try {
+      const { token } = req.query;
+      if (!token) {
+        return res.status(400).send('Token no proporcionado');
+      }
+
+      const result = await pool.query(
+        `SELECT * FROM email_confirm_tokens
+         WHERE token = $1
+           AND used_at IS NULL
+           AND expires_at > NOW()`,
+        [token]
+      );
+
+      const tokenRow = result.rows[0];
+      if (!tokenRow) {
+        return res.status(400).send('Token invalido o expirado');
+      }
+
+      await User.confirmEmail(tokenRow.user_id);
+
+      await pool.query(
+        'UPDATE email_confirm_tokens SET used_at = NOW() WHERE id = $1',
+        [tokenRow.id]
+      );
+
+      res.send('Correo confirmado exitosamente. Ya puedes iniciar sesion y realizar pedidos.');
+    } catch (error) {
+      console.error('Error al confirmar email:', error);
+      res.status(500).send('Error al confirmar el correo');
+    }
   },
 
   async login(req, res) {
@@ -172,7 +222,8 @@ const authController = {
           id: user.id,
           nombre: user.nombre,
           email: user.email,
-          rol: user.tipo_usuario
+          rol: user.tipo_usuario,
+          email_confirm: user.email_confirm ?? true
         }
       });
     } catch (error) {

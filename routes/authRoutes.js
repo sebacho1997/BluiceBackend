@@ -10,5 +10,6 @@ router.post('/signup', authController.signup);
 router.post('/refresh', authController.refresh);
 router.post('/logout', authController.logout);
 router.post('/logout-all', authMiddleware, authController.logoutAll);
+router.get('/confirm-email', authController.confirmEmail);
 
 module.exports = router;

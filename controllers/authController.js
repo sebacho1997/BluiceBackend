@@ -71,46 +71,55 @@ const authController = {
   },
 
   async signup(req, res) {
-    const { nombre, telefono, email, password, activado } = req.body;
+    try {
+      const { nombre, telefono, email, password, activado } = req.body;
 
-    const existingUser = await User.getByEmail(email);
-    if (existingUser) {
-      return res.status(400).send('El email ya esta registrado');
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    const newUser = await User.create({
-      nombre,
-      telefono,
-      email,
-      password: hashedPassword,
-      activado,
-      tipo_usuario: 'cliente',
-      email_confirm: false
-    });
-
-    const token = crypto.randomBytes(32).toString('hex');
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-
-    await pool.query(
-      'INSERT INTO email_confirm_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)',
-      [newUser.id, token, expiresAt]
-    );
-
-    await sendConfirmationEmail(email, nombre, token);
-
-    res.status(201).json({
-      message: 'Cliente registrado con exito. Revisa tu correo para confirmar tu cuenta.',
-      user: {
-        id: newUser.id,
-        nombre: newUser.nombre,
-        telefono: newUser.telefono,
-        email: newUser.email,
-        tipo_usuario: newUser.tipo_usuario,
-        email_confirm: false
+      const existingUser = await User.getByEmail(email);
+      if (existingUser) {
+        return res.status(400).send('El email ya esta registrado');
       }
-    });
+
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      const newUser = await User.create({
+        nombre,
+        telefono,
+        email,
+        password: hashedPassword,
+        activado,
+        tipo_usuario: 'cliente',
+        email_confirm: false
+      });
+
+      const token = crypto.randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+      await pool.query(
+        'INSERT INTO email_confirm_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)',
+        [newUser.id, token, expiresAt]
+      );
+
+      try {
+        await sendConfirmationEmail(email, nombre, token);
+      } catch (emailError) {
+        console.error('Error al enviar email de confirmacion:', emailError.message);
+      }
+
+      res.status(201).json({
+        message: 'Cliente registrado con exito. Revisa tu correo para confirmar tu cuenta.',
+        user: {
+          id: newUser.id,
+          nombre: newUser.nombre,
+          telefono: newUser.telefono,
+          email: newUser.email,
+          tipo_usuario: newUser.tipo_usuario,
+          email_confirm: false
+        }
+      });
+    } catch (error) {
+      console.error('Error en signup:', error);
+      res.status(500).send('Error al registrar cliente');
+    }
   },
 
   async confirmEmail(req, res) {

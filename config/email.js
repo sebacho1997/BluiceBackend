@@ -19,7 +19,7 @@ function createTransporter() {
 async function sendConfirmationEmail(email, nombre, token) {
   const transporter = createTransporter();
   if (!transporter) {
-    console.log(`[DEV] Email de confirmacion para ${email}: ${process.env.BASE_URL || 'http://localhost:5000'}/api/auth/confirm-email?token=${token}`);
+    console.log(`[DEV] Email de confirmacion pendiente para: ${email}`);
     return;
   }
 

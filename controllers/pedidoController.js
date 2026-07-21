@@ -40,28 +40,9 @@ const pedidoController = {
       res.status(500).json({ error: 'No se pudo crear el pedido' });
     }
   },
-  async getClientesDeudores() {
-    try {
-      const query = `
-        SELECT u.id AS usuario_id, u.nombre, u.email
-        FROM usuarios u
-        JOIN pedidos p ON u.id = p.usuario_id
-        WHERE p.monto_pendiente > 0
-        GROUP BY u.id
-        ORDER BY u.nombre
-      `;
-      const result = await pool.query(query);
-      return result.rows;
-    } catch (err) {
-      console.error('Error en ClientesDeudoresModel:', err);
-      throw err;
-    }
-  },
   async getClientesDeudores(req, res) {
-    console.log("entro a controller de deudores");
     try {
       const clientes = await Pedido.getClientesDeudores();
-      console.log("deudores: "+clientes);
       res.json(clientes);
     } catch (err) {
       res.status(500).json({ error: 'Error al obtener clientes deudores' });
@@ -292,8 +273,8 @@ async obtenerPedidosAsignados(req, res) {
 
   async getPendingOrders(req, res) {
     try {
-      const result = await Pedido.getPendingOrders(req, res);
-      return result; // ya devuelve res.json en el modelo
+      const pedidos = await Pedido.getPendingOrders();
+      res.json(pedidos);
     } catch (err) {
       console.error(err);
       res.status(500).json({ error: 'Error al obtener pedidos pendientes' });

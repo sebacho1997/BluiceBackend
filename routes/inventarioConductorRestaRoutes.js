@@ -1,32 +1,26 @@
 const express = require('express');
 const router = express.Router();
 const InventarioConductorRestaController = require('../controllers/inventarioConductorRestaController');
+const { authMiddleware } = require('../middleware/authMiddleware');
 
 // --------------------
 // Rutas para inventario_conductor_resta
 // --------------------
 
-// Crear inventario
-router.post('/inventario-resta', InventarioConductorRestaController.crearInventario);
+router.post('/inventario-resta', authMiddleware, InventarioConductorRestaController.crearInventario);
 
-// Verificar si existe inventario hoy
-router.get('/inventario-resta/existe/:conductorId', InventarioConductorRestaController.existeInventarioHoy);
+router.get('/inventario-resta/existe/:conductorId', authMiddleware, InventarioConductorRestaController.existeInventarioHoy);
 
-// Obtener inventario del día
-router.get('/hoy/:conductorId', InventarioConductorRestaController.getInventarioHoy);
+router.get('/hoy/:conductorId', authMiddleware, InventarioConductorRestaController.getInventarioHoy);
 
-// Obtener todos los inventarios de un conductor
-router.get('/inventario-resta/todos/:conductorId', InventarioConductorRestaController.obtenerInventarios);
+router.get('/inventario-resta/todos/:conductorId', authMiddleware, InventarioConductorRestaController.obtenerInventarios);
 
-// Obtener detalle de un inventario
-router.get('/inventario-resta/detalle/:inventarioId', InventarioConductorRestaController.obtenerDetalleInventario);
+router.get('/inventario-resta/detalle/:inventarioId', authMiddleware, InventarioConductorRestaController.obtenerDetalleInventario);
 
-// Actualizar inventario y sus detalles
-router.put('/inventario-resta', InventarioConductorRestaController.actualizarInventario);
+router.put('/inventario-resta', authMiddleware, InventarioConductorRestaController.actualizarInventario);
 
-// Cerrar inventario
-router.put('/inventario-resta/cerrar/:inventarioId', InventarioConductorRestaController.cerrarInventario);
+router.put('/inventario-resta/cerrar/:inventarioId', authMiddleware, InventarioConductorRestaController.cerrarInventario);
 
-router.put('/inventario-resta/restar', InventarioConductorRestaController.restarInventarioPedido);
+router.put('/inventario-resta/restar', authMiddleware, InventarioConductorRestaController.restarInventarioPedido);
 
 module.exports = router;

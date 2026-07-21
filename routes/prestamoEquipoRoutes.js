@@ -1,12 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const prestamoEquipoController = require('../controllers/prestamoEquipoController');
+const { authMiddleware } = require('../middleware/authMiddleware');
 
-// CRUD
-router.post('/', prestamoEquipoController.create);
-router.get('/', prestamoEquipoController.getAll);
-router.get('/:id', prestamoEquipoController.getById);
-router.put('/:id', prestamoEquipoController.update);
-router.delete('/:id', prestamoEquipoController.delete);
+router.post('/', authMiddleware, prestamoEquipoController.create);
+router.get('/', authMiddleware, prestamoEquipoController.getAll);
+router.get('/:id', authMiddleware, prestamoEquipoController.getById);
+router.put('/:id', authMiddleware, prestamoEquipoController.update);
+router.delete('/:id', authMiddleware, prestamoEquipoController.delete);
 
 module.exports = router;

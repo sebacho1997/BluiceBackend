@@ -1,15 +1,13 @@
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 
-const ACCESS_TOKEN_SECRET =
-  process.env.ACCESS_TOKEN_SECRET ||
-  process.env.JWT_SECRET ||
-  'tu_clave_secreta';
+const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET || process.env.JWT_SECRET;
+const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET || process.env.JWT_REFRESH_SECRET;
 
-const REFRESH_TOKEN_SECRET =
-  process.env.REFRESH_TOKEN_SECRET ||
-  process.env.JWT_REFRESH_SECRET ||
-  'tu_refresh_clave_secreta';
+if (!ACCESS_TOKEN_SECRET || !REFRESH_TOKEN_SECRET) {
+  console.error('FATAL: ACCESS_TOKEN_SECRET y REFRESH_TOKEN_SECRET deben estar definidos en .env');
+  process.exit(1);
+}
 
 const ACCESS_TOKEN_EXPIRES_IN = process.env.ACCESS_TOKEN_EXPIRES_IN || '15m';
 const REFRESH_TOKEN_DAYS = Number(process.env.REFRESH_TOKEN_DAYS || 60);

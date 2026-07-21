@@ -483,17 +483,26 @@ async getPendingWithoutDriver() {
     throw new Error('No se pudo asignar el conductor');
   }
 },
-  async getPendingOrders(req, res) {
-    console.log("pedido req y res"+ req + "+" + res);
+  async getPendingOrders() {
   try {
     const result = await pool.query(
       "SELECT * FROM pedidos WHERE estado = 'pendiente'"
     );
-    res.json(result.rows);
+    return result.rows;
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Error al obtener pedidos pendientes' });
+    throw new Error('Error al obtener pedidos pendientes');
   }
+},
+async guardarComprobante(pedido_id, urlComprobante, idComprobante) {
+  const result = await pool.query(
+    `UPDATE pedidos
+     SET comprobante = $1, comprobante_id = $2
+     WHERE id = $3
+     RETURNING *`,
+    [urlComprobante, idComprobante, pedido_id]
+  );
+  return result.rows[0];
 },
 async getProductosByPedido(pedidoId) {
   try {
@@ -534,7 +543,7 @@ async agregarRecibo(pedido_id, numeroRecibo) {
 async confirmarEntrega(pedido_id) {
   try {
     const pedidoRes = await pool.query(
-      `SELECT metodo_pago, comprobante, estado
+      `SELECT estado, comprobante
        FROM pedidos
        WHERE id = $1`,
       [pedido_id]
@@ -546,8 +555,18 @@ async confirmarEntrega(pedido_id) {
     if (pedido.estado === 'entregado') {
       throw new Error('El pedido ya fue entregado');
     }
-    if (pedido.metodo_pago === 'QR' && !pedido.comprobante) {
-      throw new Error('No se puede entregar: falta comprobante QR');
+
+    const pagosRes = await pool.query(
+      `SELECT COUNT(*) AS qr_sin_comprobante
+       FROM pagos_pedido
+       WHERE pedido_id = $1
+         AND metodo_pago ILIKE 'qr'
+         AND (comprobante IS NULL OR comprobante = '')`,
+      [pedido_id]
+    );
+
+    if (Number(pagosRes.rows[0].qr_sin_comprobante) > 0) {
+      throw new Error('No se puede entregar: hay pagos QR sin comprobante');
     }
     const result = await pool.query(
       `UPDATE pedidos

@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const pedidoImagenesController = require('../controllers/pedidoImagenesController');
-const authMiddleware = require('../middleware/authMiddleware');
+const { authMiddleware } = require('../middleware/authMiddleware');
 const { uploadPedidoImagenes } = require('../middleware/upload'); // middleware Cloudinary
 
 // Subir imagen de un pedido

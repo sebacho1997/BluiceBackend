@@ -43,7 +43,9 @@ async function buildAuthResponse(user) {
 const authController = {
   async register(req, res) {
     try {
-      const { nombre, email, telefono, password, activado, tipo_usuario } = req.body;
+      const { nombre, email, telefono, password, tipo_usuario } = req.body;
+      const userTipo = tipo_usuario || 'admin';
+      const activado = true;
 
       if (email && email.trim() !== '') {
         const existingUser = await User.getByEmail(email);
@@ -60,7 +62,7 @@ const authController = {
         email,
         password: hashedPassword,
         activado,
-        tipo_usuario
+        tipo_usuario: userTipo
       });
 
       res.status(201).json(newUser);
@@ -157,11 +159,7 @@ const authController = {
   },
 
   async login(req, res) {
-    const { email } = req.body;
-    const contrasena =
-      req.body.contrasena ??
-      req.body['contraseña'] ??
-      req.body['contrasena'];
+    const { email, contrasena } = req.body;
 
     const user = await User.getByEmail(email);
     if (!user) {

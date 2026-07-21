@@ -1,14 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const pedidoProductoController = require('../controllers/pedidoProductoController');
+const { authMiddleware } = require('../middleware/authMiddleware');
 
-// Agregar un producto a un pedido
-router.post('/', pedidoProductoController.agregarProducto);
+router.post('/', authMiddleware, pedidoProductoController.agregarProducto);
 
-// Obtener productos de un pedido
-router.get('/:pedido_id', pedidoProductoController.obtenerProductosPorPedido);
+router.get('/:pedido_id', authMiddleware, pedidoProductoController.obtenerProductosPorPedido);
 
-// Eliminar productos de un pedido
-router.delete('/:pedido_id', pedidoProductoController.eliminarProductosPorPedido);
+router.delete('/:pedido_id', authMiddleware, pedidoProductoController.eliminarProductosPorPedido);
 
 module.exports = router;

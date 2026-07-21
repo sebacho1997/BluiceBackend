@@ -3,7 +3,11 @@ const GastosDia = require('../models/gastosDia.js');
 const gastosDiaController = {
   async create(req, res) {
     try {
-      const gasto = await GastosDia.create(req.body);
+      const { id_conductor, descripcion, monto } = req.body;
+      if (!id_conductor || !descripcion || monto === undefined) {
+        return res.status(400).json({ error: 'id_conductor, descripcion y monto son requeridos' });
+      }
+      const gasto = await GastosDia.create({ id_conductor, descripcion, monto });
       res.json(gasto);
     } catch (error) {
       console.error(error);

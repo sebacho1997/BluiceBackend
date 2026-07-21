@@ -28,6 +28,10 @@ const ContratosController = {
 
   async create(req, res) {
     try {
+      const { cliente_id, monto_total } = req.body;
+      if (!cliente_id || monto_total === undefined) {
+        return res.status(400).json({ error: 'cliente_id y monto_total son requeridos' });
+      }
       const contrato = await ContratosModel.createContrato(req.body);
       res.json(contrato);
     } catch (err) {
@@ -37,7 +41,14 @@ const ContratosController = {
 
   async update(req, res) {
     try {
-      const contrato = await ContratosModel.updateContrato(req.params.id, req.body);
+      const { cliente_id, monto_total, monto_restante, estado } = req.body;
+      if (estado && !['creado', 'asignado', 'proceso', 'finalizado'].includes(estado)) {
+        return res.status(400).json({ error: 'Estado invalido' });
+      }
+      const contrato = await ContratosModel.updateContrato(req.params.id, {
+        cliente_id, monto_total, monto_restante, estado,
+        ...req.body
+      });
       res.json(contrato);
     } catch (err) {
       res.status(500).json({ error: err.message });
@@ -65,6 +76,10 @@ const ContratosController = {
 
   async createConsumo(req, res) {
     try {
+      const { contrato_id, monto_consumido } = req.body;
+      if (!contrato_id || monto_consumido === undefined) {
+        return res.status(400).json({ error: 'contrato_id y monto_consumido son requeridos' });
+      }
       const consumo = await ContratosModel.createConsumo(req.body);
       res.json(consumo);
     } catch (err) {

@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const pedidoController = require('../controllers/pedidoController');
-const authMiddleware = require('../middleware/authMiddleware');
+const { authMiddleware, requireRoles } = require('../middleware/authMiddleware');
 const { uploadComprobantes } = require('../middleware/upload'); // <-- importamos el middleware
 
 router.get('/deudores',authMiddleware, pedidoController.getClientesDeudores);
@@ -56,6 +56,6 @@ router.put('/edit/:pedidoId/productos/:pedidoproductoId/cantidad', authMiddlewar
 
 // Entrega parcial de un pedido
 router.put('/:id/entrega-parcial', authMiddleware, pedidoController.registrarEntregaParcial);
-module.exports = router;
 
-router.patch('/:id/pagado', authMiddleware, pedidoController.marcarPagado);
+router.patch('/:id/pagado', authMiddleware, requireRoles('admin', 'conductor'), pedidoController.marcarPagado);
+module.exports = router;

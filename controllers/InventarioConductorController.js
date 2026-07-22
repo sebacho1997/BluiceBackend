@@ -28,7 +28,9 @@ const InventarioConductorController = {
   try {
     const { conductor_id } = req.params;
     if (!conductor_id) return res.status(400).json({ error: 'Falta id del conductor' });
-
+    if (req.user.tipo_usuario !== 'administrador' && String(req.user.id) !== conductor_id) {
+      return res.status(403).json({ error: 'No autorizado' });
+    }
     const inventario = await InventarioConductor.getInventarioHoy(conductor_id);
     if (!inventario) return res.status(404).json({ message: 'No hay inventario hoy' });
 
@@ -45,7 +47,9 @@ const InventarioConductorController = {
       if (!conductor_id) {
         return res.status(400).json({ message: 'Falta el id del conductor' });
       }
-
+      if (req.user.tipo_usuario !== 'administrador' && String(req.user.id) !== conductor_id) {
+        return res.status(403).json({ error: 'No autorizado' });
+      }
       const inventarios = await InventarioConductor.obtenerInventarios(conductor_id);
       res.json(inventarios);
     } catch (error) {
@@ -75,7 +79,9 @@ const InventarioConductorController = {
       if (!conductorId) {
         return res.status(400).json({ message: 'Falta el conductorId' });
       }
-
+      if (req.user.tipo_usuario !== 'administrador' && String(req.user.id) !== conductorId) {
+        return res.status(403).json({ error: 'No autorizado' });
+      }
       const existe = await InventarioConductor.existeInventarioHoy(conductorId);
 
       return res.status(200).json({ existe });
@@ -133,7 +139,9 @@ const InventarioConductorController = {
       const { conductor_id } = req.params;
 
       if (!conductor_id) return res.status(400).json({ message: 'Falta id del conductor' });
-
+      if (req.user.tipo_usuario !== 'administrador' && String(req.user.id) !== conductor_id) {
+        return res.status(403).json({ error: 'No autorizado' });
+      }
       const devoluciones = await InventarioConductor.obtenerDevoluciones(conductor_id);
 
       res.json(devoluciones);

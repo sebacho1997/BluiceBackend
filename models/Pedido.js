@@ -338,7 +338,7 @@ async getOrdersByUserId(usuario_id) {
   async getAll() {
     try {
       const result = await pool.query(
-        `SELECT * FROM pedidos ORDER BY id DESC`
+        `SELECT * FROM pedidos ORDER BY id DESC LIMIT 1000`
       );
       return result.rows;
     } catch (error) {

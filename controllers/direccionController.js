@@ -37,6 +37,9 @@ const direccionController = {
   async getByUserId(req, res) {
     try {
       const { usuario_id } = req.params;
+      if (req.user.tipo_usuario !== 'administrador' && String(req.user.id) !== usuario_id) {
+        return res.status(403).json({ error: 'No autorizado' });
+      }
       const direcciones = await Direccion.getByUserId(usuario_id);
       res.json(direcciones);
     } catch (error) {

@@ -74,7 +74,7 @@ const authController = {
 
   async signup(req, res) {
     try {
-      const { nombre, telefono, email, password, activado } = req.body;
+      const { nombre, telefono, email, password } = req.body;
 
       const existingUser = await User.getByEmail(email);
       if (existingUser) {
@@ -88,7 +88,7 @@ const authController = {
         telefono,
         email,
         password: hashedPassword,
-        activado,
+        activado: false,
         tipo_usuario: 'cliente',
         email_confirm: false
       });

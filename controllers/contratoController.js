@@ -46,8 +46,7 @@ const ContratosController = {
         return res.status(400).json({ error: 'Estado invalido' });
       }
       const contrato = await ContratosModel.updateContrato(req.params.id, {
-        cliente_id, monto_total, monto_restante, estado,
-        ...req.body
+        cliente_id, monto_total, monto_restante, estado
       });
       res.json(contrato);
     } catch (err) {

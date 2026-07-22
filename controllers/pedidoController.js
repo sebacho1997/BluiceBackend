@@ -148,6 +148,9 @@ async marcarCompletado(req, res) {
   async obtenerPedidosPorUsuario(req, res) {
   try {
     const { usuario_id } = req.params;
+    if (req.user.tipo_usuario !== 'administrador' && String(req.user.id) !== usuario_id) {
+      return res.status(403).json({ error: 'No autorizado' });
+    }
     const pedidos = await Pedido.getOrdersByUserId(usuario_id);
     res.json(pedidos);
   } catch (error) {
@@ -226,6 +229,9 @@ async registrarEntregaParcial(req, res) {
 async obtenerPedidosAsignados(req, res) {
   try {
     const { conductor_id } = req.params; // ID del conductor desde la URL
+    if (req.user.tipo_usuario !== 'administrador' && String(req.user.id) !== conductor_id) {
+      return res.status(403).json({ error: 'No autorizado' });
+    }
     const pedidos = await Pedido.getAssignedOrdersByDriver(conductor_id);
     res.json(pedidos);
   } catch (error) {
@@ -252,6 +258,9 @@ async obtenerPedidosAsignados(req, res) {
   async obtenerPedidosPorEstadoycliente(req, res) {
     try {
       const { usuario_id, estado } = req.params;
+      if (req.user.tipo_usuario !== 'administrador' && String(req.user.id) !== usuario_id) {
+        return res.status(403).json({ error: 'No autorizado' });
+      }
       const pedidos = await Pedido.getByEstadoYCliente(usuario_id, estado);
       res.json(pedidos);
     } catch (error) {

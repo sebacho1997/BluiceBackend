@@ -36,9 +36,11 @@ app.use(helmet({
   contentSecurityPolicy: false,
 }));
 app.use('/reset-password', require('./routes/resetPasswordPage'));
+const baseUrlOrigin = (process.env.BASE_URL || '').replace(/\/api$/i, '');
 const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173')
   .split(',')
-  .map(s => s.trim());
+  .map(s => s.trim())
+  .concat(baseUrlOrigin ? [baseUrlOrigin] : []);
 
 app.use(cors({
   origin: (origin, cb) => {

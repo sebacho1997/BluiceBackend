@@ -128,7 +128,7 @@ const authController = {
     try {
       const { token } = req.query;
       if (!token) {
-        return res.status(400).send('Token no proporcionado');
+        return res.redirect(`/confirm-email?status=error&message=${encodeURIComponent('Token no proporcionado')}`);
       }
 
       const result = await pool.query(
@@ -141,7 +141,7 @@ const authController = {
 
       const tokenRow = result.rows[0];
       if (!tokenRow) {
-        return res.status(400).send('Token invalido o expirado');
+        return res.redirect(`/confirm-email?status=error&message=${encodeURIComponent('Token invalido o expirado')}`);
       }
 
       await User.confirmEmail(tokenRow.user_id);
@@ -151,10 +151,10 @@ const authController = {
         [tokenRow.id]
       );
 
-      res.send('Correo confirmado exitosamente. Ya puedes iniciar sesion y realizar pedidos.');
+      res.redirect('/confirm-email?status=success');
     } catch (error) {
       console.error('Error al confirmar email:', error);
-      res.status(500).send('Error al confirmar el correo');
+      res.redirect(`/confirm-email?status=error&message=${encodeURIComponent('Error al confirmar el correo')}`);
     }
   },
 

@@ -2,11 +2,11 @@ const https = require('https');
 
 const WEB_URL = process.env.WEB_URL || 'https://bluiceweb.netlify.app';
 
-function sendViaEmailJS({ to, toName, subject, resetLink }) {
+function sendViaEmailJS({ to, toName, subject, resetLink, templateId }) {
   return new Promise((resolve, reject) => {
     const data = JSON.stringify({
       service_id: process.env.EMAILJS_SERVICE_ID,
-      template_id: process.env.EMAILJS_TEMPLATE_ID,
+      template_id: templateId || process.env.EMAILJS_TEMPLATE_ID,
       user_id: process.env.EMAILJS_PUBLIC_KEY,
       accessToken: process.env.EMAILJS_PRIVATE_KEY,
       template_params: {
@@ -74,17 +74,20 @@ async function sendConfirmationEmail(email, nombre, token) {
   const baseUrl = process.env.BASE_URL || 'https://bluicebackend.onrender.com';
   const confirmUrl = `${baseUrl}/api/auth/confirm-email?token=${token}`;
 
-  if (!process.env.EMAILJS_SERVICE_ID || !process.env.EMAILJS_TEMPLATE_ID) {
+  if (!process.env.EMAILJS_SERVICE_ID) {
     console.log(`[DEV] Email de confirmacion pendiente para: ${email}`);
     console.log(`[DEV] Link: ${confirmUrl}`);
     return;
   }
+
+  const template = process.env.EMAILJS_CONFIRM_TEMPLATE_ID || process.env.EMAILJS_TEMPLATE_ID;
 
   await sendViaEmailJS({
     to: email,
     toName: nombre,
     subject: 'Confirma tu correo electronico - BluIce',
     resetLink: confirmUrl,
+    templateId: template,
   });
 }
 

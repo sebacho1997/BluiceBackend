@@ -1,5 +1,4 @@
 require('express-async-errors');
-require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -33,15 +32,13 @@ const reporteComisiones = require('./models/reporteComisiones');
 const app = express();
 
 app.use(helmet());
-const compression = require('compression');
-app.use(compression());
 const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173')
   .split(',')
   .map(s => s.trim());
 
 app.use(cors({
   origin: (origin, cb) => {
-    if (!origin || allowedOrigins.some(o => origin === o || origin.startsWith(o + '/'))) {
+    if (!origin || allowedOrigins.some(o => origin.startsWith(o))) {
       cb(null, true);
     } else {
       cb(new Error('Not allowed by CORS'));
@@ -59,15 +56,9 @@ const authLimiter = rateLimit({
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/signup', authLimiter);
 app.use('/api/auth/register', authLimiter);
-
-const generalLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 200,
-  message: { error: 'Demasiadas solicitudes, intente de nuevo en 1 minuto' }
-});
-app.use('/api/', generalLimiter);
-
-app.use(express.json({ limit: '1mb' }));
+app.use('/api/auth/forgot-password', authLimiter);
+app.use('/api/auth/reset-password', authLimiter);
+app.use(express.json({ limit: '10mb' }));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
@@ -94,11 +85,6 @@ app.use('/api', reporteClienteMes);
 app.use('/api', reporteClientePersonalizado);
 app.use('/api', reporteGeneral);
 app.use('/api', reporteComisiones);
-
-app.use((err, req, res, next) => {
-  console.error('Error:', err.message);
-  res.status(err.status || 500).json({ error: 'Error interno del servidor' });
-});
 
 const PORT = process.env.PORT || 5000;
 

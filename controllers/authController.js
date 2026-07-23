@@ -3,7 +3,7 @@ const crypto = require('crypto');
 const User = require('../models/user');
 const RefreshToken = require('../models/refreshToken');
 const pool = require('../config/db');
-const { sendConfirmationEmail } = require('../config/email');
+const { sendConfirmationEmail, sendPasswordResetEmail } = require('../config/email');
 const {
   signAccessToken,
   signRefreshToken,
@@ -74,7 +74,7 @@ const authController = {
 
   async signup(req, res) {
     try {
-      const { nombre, telefono, email, password } = req.body;
+      const { nombre, telefono, email, password, activado } = req.body;
 
       const existingUser = await User.getByEmail(email);
       if (existingUser) {
@@ -88,7 +88,7 @@ const authController = {
         telefono,
         email,
         password: hashedPassword,
-        activado: false,
+        activado,
         tipo_usuario: 'cliente',
         email_confirm: false
       });
@@ -246,6 +246,89 @@ const authController = {
     }
 
     res.json({ message: 'Sesion cerrada correctamente' });
+  },
+
+  async forgotPassword(req, res) {
+    try {
+      const { email } = req.body;
+      if (!email) {
+        return res.status(400).json({ error: 'Email es requerido' });
+      }
+
+      const user = await User.getByEmail(email);
+      if (!user) {
+        return res.json({ message: 'Si el correo existe, recibiras las instrucciones.' });
+      }
+
+      const token = crypto.randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+      await pool.query(
+        `DELETE FROM password_reset_tokens WHERE user_id = $1 AND used_at IS NULL`,
+        [user.id]
+      );
+
+      await pool.query(
+        'INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)',
+        [user.id, token, expiresAt]
+      );
+
+      try {
+        await sendPasswordResetEmail(email, user.nombre, token);
+      } catch (emailError) {
+        console.error('Error al enviar email de recuperacion:', emailError.message);
+      }
+
+      res.json({ message: 'Si el correo existe, recibiras las instrucciones.' });
+    } catch (error) {
+      console.error('Error en forgotPassword:', error);
+      res.status(500).json({ error: 'Error al procesar la solicitud' });
+    }
+  },
+
+  async resetPassword(req, res) {
+    try {
+      const { token, newPassword } = req.body;
+      if (!token || !newPassword) {
+        return res.status(400).json({ error: 'Token y nueva contrasena son requeridos' });
+      }
+
+      if (newPassword.length < 6) {
+        return res.status(400).json({ error: 'La contrasena debe tener al menos 6 caracteres' });
+      }
+
+      const result = await pool.query(
+        `SELECT * FROM password_reset_tokens
+         WHERE token = $1
+           AND used_at IS NULL
+           AND expires_at > NOW()`,
+        [token]
+      );
+
+      const tokenRow = result.rows[0];
+      if (!tokenRow) {
+        return res.status(400).json({ error: 'Token invalido o expirado' });
+      }
+
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+      await pool.query(
+        'UPDATE usuarios SET password = $1 WHERE id = $2',
+        [hashedPassword, tokenRow.user_id]
+      );
+
+      await pool.query(
+        'UPDATE password_reset_tokens SET used_at = NOW() WHERE id = $1',
+        [tokenRow.id]
+      );
+
+      await RefreshToken.revokeAllByUserId(tokenRow.user_id);
+
+      res.json({ message: 'Contrasena actualizada exitosamente' });
+    } catch (error) {
+      console.error('Error en resetPassword:', error);
+      res.status(500).json({ error: 'Error al restablecer la contrasena' });
+    }
   },
 
   async logoutAll(req, res) {

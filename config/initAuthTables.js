@@ -45,20 +45,26 @@ async function initAuthTables() {
     ON email_confirm_tokens(token)
   `);
 
-  // Additional indexes for performance
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_usuarios_email ON usuarios(email)`);
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_usuarios_tipo_usuario ON usuarios(tipo_usuario)`);
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_pedidos_usuario_id ON pedidos(usuario_id)`);
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_pedidos_estado ON pedidos(estado)`);
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_pedidos_id_conductor ON pedidos(id_conductor)`);
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_pedidos_fecha_entrega ON pedidos(fecha_entrega)`);
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_pedidoproducto_pedido_id ON pedidoproducto(pedido_id)`);
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_pagos_pedido_pedido_id ON pagos_pedido(pedido_id)`);
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_gastos_dia_conductor ON gastos_dia(id_conductor)`);
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_gastos_dia_fecha ON gastos_dia(DATE(fecha_gasto))`);
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_contratos_cliente_id ON contratos(cliente_id)`);
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_contratos_conductor_id ON contratos(conductor_id)`);
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_consumos_contrato ON consumos_contrato(contrato_id)`);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS password_reset_tokens (
+      id BIGSERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+      token VARCHAR(64) NOT NULL UNIQUE,
+      expires_at TIMESTAMPTZ NOT NULL,
+      used_at TIMESTAMPTZ NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user_id
+    ON password_reset_tokens(user_id)
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_token
+    ON password_reset_tokens(token)
+  `);
 }
 
 module.exports = initAuthTables;

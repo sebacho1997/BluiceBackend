@@ -59,7 +59,8 @@ async function sendPasswordResetEmail(email, nombre, token) {
     return;
   }
 
-  const resetLink = `${WEB_URL}/reset-password?token=${token}`;
+  const baseUrl = process.env.BASE_URL || 'https://bluicebackend.onrender.com';
+  const resetLink = `${baseUrl}/reset-password?token=${token}`;
 
   await sendViaEmailJS({
     to: email,

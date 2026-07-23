@@ -32,7 +32,10 @@ const reporteComisiones = require('./models/reporteComisiones');
 const app = express();
 
 app.set('trust proxy', 1);
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: false,
+}));
+app.use('/reset-password', require('./routes/resetPasswordPage'));
 const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173')
   .split(',')
   .map(s => s.trim());

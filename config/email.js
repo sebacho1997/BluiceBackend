@@ -1,21 +1,43 @@
-const { Resend } = require('resend');
+const nodemailer = require('nodemailer');
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
-const FROM_EMAIL = process.env.EMAIL_FROM || 'onboarding@resend.dev';
 const WEB_URL = process.env.WEB_URL || 'https://bluiceweb.netlify.app';
 
-async function sendConfirmationEmail(email, nombre, token) {
-  if (!process.env.RESEND_API_KEY) {
-    console.log(`[DEV] Email de confirmacion pendiente para: ${email}`);
+function createTransporter() {
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    return null;
+  }
+
+  return nodemailer.createTransport({
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+    port: Number(process.env.SMTP_PORT) || 587,
+    secure: (process.env.SMTP_ENCRYPTION || 'tls') === 'ssl',
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+  });
+}
+
+async function _send({ to, subject, html }) {
+  const transporter = createTransporter();
+  if (!transporter) {
+    console.log(`[DEV] Email pendiente para: ${to}`);
     return;
   }
 
+  await transporter.sendMail({
+    from: `"BluIce" <${process.env.SMTP_USER}>`,
+    to,
+    subject,
+    html,
+  });
+}
+
+async function sendConfirmationEmail(email, nombre, token) {
   const baseUrl = process.env.BASE_URL || 'https://bluicebackend.onrender.com';
   const confirmUrl = `${baseUrl}/api/auth/confirm-email?token=${token}`;
 
-  await resend.emails.send({
-    from: FROM_EMAIL,
+  await _send({
     to: email,
     subject: 'Confirma tu correo electronico - BluIce',
     html: `
@@ -35,16 +57,9 @@ async function sendConfirmationEmail(email, nombre, token) {
 }
 
 async function sendPasswordResetEmail(email, nombre, token) {
-  if (!process.env.RESEND_API_KEY) {
-    console.log(`[DEV] Email de recuperacion pendiente para: ${email}`);
-    console.log(`[DEV] Link: ${WEB_URL}/reset-password?token=${token}`);
-    return;
-  }
-
   const resetUrl = `${WEB_URL}/reset-password?token=${token}`;
 
-  await resend.emails.send({
-    from: FROM_EMAIL,
+  await _send({
     to: email,
     subject: 'Recuperacion de contrasena - BluIce',
     html: `

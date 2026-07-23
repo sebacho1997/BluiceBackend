@@ -31,6 +31,7 @@ const reporteComisiones = require('./models/reporteComisiones');
 
 const app = express();
 
+app.set('trust proxy', 1);
 app.use(helmet());
 const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173')
   .split(',')

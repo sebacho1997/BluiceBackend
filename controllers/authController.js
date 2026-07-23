@@ -34,6 +34,7 @@ async function buildAuthResponse(user) {
       id: user.id,
       nombre: user.nombre,
       email: user.email,
+      telefono: user.telefono ?? '',
       rol: user.tipo_usuario,
       email_confirm: user.email_confirm ?? true
     }
@@ -93,22 +94,8 @@ const authController = {
         email_confirm: false
       });
 
-      const token = crypto.randomBytes(32).toString('hex');
-      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-
-      await pool.query(
-        'INSERT INTO email_confirm_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)',
-        [newUser.id, token, expiresAt]
-      );
-
-      try {
-        await sendConfirmationEmail(email, nombre, token);
-      } catch (emailError) {
-        console.error('Error al enviar email de confirmacion:', emailError.message);
-      }
-
       res.status(201).json({
-        message: 'Cliente registrado con exito. Revisa tu correo para confirmar tu cuenta.',
+        message: 'Cliente registrado con exito.',
         user: {
           id: newUser.id,
           nombre: newUser.nombre,
@@ -330,6 +317,43 @@ const authController = {
     } catch (error) {
       console.error('Error en resetPassword:', error);
       res.status(500).json({ error: 'Error al restablecer la contrasena' });
+    }
+  },
+
+  async resendConfirmation(req, res) {
+    try {
+      const user = await User.getByIdWithPassword(req.user.id);
+      if (!user) {
+        return res.status(404).json({ error: 'Usuario no encontrado' });
+      }
+
+      if (user.email_confirm) {
+        return res.json({ message: 'Tu correo ya esta confirmado.' });
+      }
+
+      await pool.query(
+        'DELETE FROM email_confirm_tokens WHERE user_id = $1 AND used_at IS NULL',
+        [user.id]
+      );
+
+      const token = crypto.randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+      await pool.query(
+        'INSERT INTO email_confirm_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)',
+        [user.id, token, expiresAt]
+      );
+
+      try {
+        await sendConfirmationEmail(user.email, user.nombre, token);
+      } catch (emailError) {
+        console.error('Error al reenviar email de confirmacion:', emailError.message);
+      }
+
+      res.json({ message: 'Correo de confirmacion reenviado. Revisa tu bandeja de entrada.' });
+    } catch (error) {
+      console.error('Error en resendConfirmation:', error);
+      res.status(500).json({ error: 'Error al reenviar el correo' });
     }
   },
 

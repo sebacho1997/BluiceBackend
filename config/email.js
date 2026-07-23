@@ -1,35 +1,71 @@
-const nodemailer = require('nodemailer');
+const https = require('https');
 
 const WEB_URL = process.env.WEB_URL || 'https://bluiceweb.netlify.app';
 
-function createTransporter() {
-  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-    return null;
-  }
+function sendViaEmailJS({ to, toName, subject, resetLink }) {
+  return new Promise((resolve, reject) => {
+    const data = JSON.stringify({
+      service_id: process.env.EMAILJS_SERVICE_ID,
+      template_id: process.env.EMAILJS_TEMPLATE_ID,
+      user_id: process.env.EMAILJS_PUBLIC_KEY,
+      accessToken: process.env.EMAILJS_PRIVATE_KEY,
+      template_params: {
+        to_email: to,
+        to_name: toName,
+        subject,
+        reset_link: resetLink,
+      },
+    });
 
-  return nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: Number(process.env.SMTP_PORT) || 587,
-    secure: (process.env.SMTP_ENCRYPTION || 'tls') === 'ssl',
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
+    const req = https.request(
+      {
+        hostname: 'api.emailjs.com',
+        path: '/api/v1.0/email/send',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(data),
+        },
+      },
+      (res) => {
+        let body = '';
+        res.on('data', (chunk) => (body += chunk));
+        res.on('end', () => {
+          if (res.statusCode === 200) {
+            console.log(`Email enviado a ${to}`);
+            resolve();
+          } else {
+            console.error(`EmailJS error ${res.statusCode}: ${body}`);
+            reject(new Error(`EmailJS: ${res.statusCode} ${body}`));
+          }
+        });
+      },
+    );
+
+    req.on('error', (err) => {
+      console.error(`Error enviando email a ${to}:`, err.message);
+      reject(err);
+    });
+
+    req.write(data);
+    req.end();
   });
 }
 
-async function _send({ to, subject, html }) {
-  const transporter = createTransporter();
-  if (!transporter) {
-    console.log(`[DEV] Email pendiente para: ${to}`);
+async function sendPasswordResetEmail(email, nombre, token) {
+  if (!process.env.EMAILJS_SERVICE_ID || !process.env.EMAILJS_TEMPLATE_ID) {
+    console.log(`[DEV] Email pendiente para: ${email}`);
+    console.log(`[DEV] Link: ${WEB_URL}/reset-password?token=${token}`);
     return;
   }
 
-  await transporter.sendMail({
-    from: `"BluIce" <${process.env.SMTP_USER}>`,
-    to,
-    subject,
-    html,
+  const resetLink = `${WEB_URL}/reset-password?token=${token}`;
+
+  await sendViaEmailJS({
+    to: email,
+    toName: nombre,
+    subject: 'Recuperacion de contrasena - BluIce',
+    resetLink,
   });
 }
 
@@ -37,46 +73,17 @@ async function sendConfirmationEmail(email, nombre, token) {
   const baseUrl = process.env.BASE_URL || 'https://bluicebackend.onrender.com';
   const confirmUrl = `${baseUrl}/api/auth/confirm-email?token=${token}`;
 
-  await _send({
+  if (!process.env.EMAILJS_SERVICE_ID || !process.env.EMAILJS_TEMPLATE_ID) {
+    console.log(`[DEV] Email de confirmacion pendiente para: ${email}`);
+    console.log(`[DEV] Link: ${confirmUrl}`);
+    return;
+  }
+
+  await sendViaEmailJS({
     to: email,
+    toName: nombre,
     subject: 'Confirma tu correo electronico - BluIce',
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
-        <h2 style="color: #1D4ED8;">Bienvenido a BluIce, ${nombre}!</h2>
-        <p>Gracias por registrarte. Para poder realizar pedidos, necesitas confirmar tu correo electronico.</p>
-        <a href="${confirmUrl}"
-           style="display: inline-block; padding: 12px 24px; background-color: #2563EB; color: white; text-decoration: none; border-radius: 8px; font-weight: bold; margin: 16px 0;">
-          Confirmar mi correo
-        </a>
-        <p style="color: #6B7280; font-size: 14px;">O copia este enlace en tu navegador:</p>
-        <p style="color: #6B7280; font-size: 12px; word-break: break-all;">${confirmUrl}</p>
-        <p style="color: #6B7280; font-size: 14px;">Este enlace expirara en 24 horas.</p>
-      </div>
-    `,
-  });
-}
-
-async function sendPasswordResetEmail(email, nombre, token) {
-  const resetUrl = `${WEB_URL}/reset-password?token=${token}`;
-
-  await _send({
-    to: email,
-    subject: 'Recuperacion de contrasena - BluIce',
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
-        <h2 style="color: #1D4ED8;">Recuperacion de contrasena - BluIce</h2>
-        <p>Hola ${nombre},</p>
-        <p>Recibimos una solicitud para restablecer tu contrasena. Haz clic en el boton de abajo para crear una nueva:</p>
-        <a href="${resetUrl}"
-           style="display: inline-block; padding: 12px 24px; background-color: #2563EB; color: white; text-decoration: none; border-radius: 8px; font-weight: bold; margin: 16px 0;">
-          Restablecer contrasena
-        </a>
-        <p style="color: #6B7280; font-size: 14px;">O copia este enlace en tu navegador:</p>
-        <p style="color: #6B7280; font-size: 12px; word-break: break-all;">${resetUrl}</p>
-        <p style="color: #6B7280; font-size: 14px;">Este enlace expirara en 1 hora.</p>
-        <p style="color: #6B7280; font-size: 14px;">Si no solicitaste este cambio, ignora este mensaje.</p>
-      </div>
-    `,
+    resetLink: confirmUrl,
   });
 }
 

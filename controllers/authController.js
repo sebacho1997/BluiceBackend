@@ -251,14 +251,18 @@ const authController = {
   async forgotPassword(req, res) {
     try {
       const { email } = req.body;
+      console.log(`[forgotPassword] Solicitud para: ${email}`);
       if (!email) {
         return res.status(400).json({ error: 'Email es requerido' });
       }
 
       const user = await User.getByEmail(email);
       if (!user) {
+        console.log(`[forgotPassword] Usuario no encontrado: ${email}`);
         return res.json({ message: 'Si el correo existe, recibiras las instrucciones.' });
       }
+
+      console.log(`[forgotPassword] Usuario encontrado: ${user.nombre}, generando token...`);
 
       const token = crypto.randomBytes(32).toString('hex');
       const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
@@ -273,15 +277,13 @@ const authController = {
         [user.id, token, expiresAt]
       );
 
-      try {
-        await sendPasswordResetEmail(email, user.nombre, token);
-      } catch (emailError) {
-        console.error('Error al enviar email de recuperacion:', emailError.message);
-      }
+      console.log(`[forgotPassword] Token guardado, enviando email a: ${email}`);
+
+      await sendPasswordResetEmail(email, user.nombre, token);
 
       res.json({ message: 'Si el correo existe, recibiras las instrucciones.' });
     } catch (error) {
-      console.error('Error en forgotPassword:', error);
+      console.error('[forgotPassword] Error:', error.message);
       res.status(500).json({ error: 'Error al procesar la solicitud' });
     }
   },

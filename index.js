@@ -29,6 +29,7 @@ const initAuthTables = require('./config/initAuthTables');
 const reporteGeneral = require('./models/reporteGeneral');
 const reporteComisiones = require('./models/reporteComisiones');
 const configRoutes = require('./routes/configRoutes');
+const dashboardRoutes = require('./routes/dashboardRoutes');
 
 const app = express();
 
@@ -81,6 +82,7 @@ app.use('/api/prestamos', prestamoEquipoRoutes);
 app.use('/api/gastos', gastosDiaRoutes);
 app.use('/api/contratos', contratoRoutes);
 app.use('/api/config', configRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 app.use('/api', reporteRouter);
 app.use('/api', reporteMes);

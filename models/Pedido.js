@@ -324,7 +324,7 @@ async getOrdersByUserId(usuario_id) {
   try {
     const result = await pool.query(
       `SELECT * FROM pedidos
-       WHERE usuario_id = $1 AND (estado = 'pendiente' OR estado = 'asignado')
+       WHERE usuario_id = $1
        ORDER BY id DESC`,
       [usuario_id]
     );

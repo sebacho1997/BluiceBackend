@@ -28,6 +28,7 @@ const clienteContratoPersonalizado = require('./models/clienteContratoPersonaliz
 const initAuthTables = require('./config/initAuthTables');
 const reporteGeneral = require('./models/reporteGeneral');
 const reporteComisiones = require('./models/reporteComisiones');
+const configRoutes = require('./routes/configRoutes');
 
 const app = express();
 
@@ -37,6 +38,7 @@ app.use(helmet({
 }));
 app.use('/reset-password', require('./routes/resetPasswordPage'));
 app.use('/confirm-email', require('./routes/confirmEmailPage'));
+app.use('/privacy-policy', require('./routes/privacyPolicyPage'));
 const baseUrlOrigin = (process.env.BASE_URL || '').replace(/\/api$/i, '');
 const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173')
   .split(',')
@@ -78,6 +80,7 @@ app.use('/api/pedidoImagenes', pedidoImagenesRoutes);
 app.use('/api/prestamos', prestamoEquipoRoutes);
 app.use('/api/gastos', gastosDiaRoutes);
 app.use('/api/contratos', contratoRoutes);
+app.use('/api/config', configRoutes);
 
 app.use('/api', reporteRouter);
 app.use('/api', reporteMes);

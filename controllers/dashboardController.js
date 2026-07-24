@@ -3,7 +3,8 @@ const pool = require('../config/db');
 const DashboardController = {
   async getDashboardData(req, res) {
     try {
-      const [ventasHoy, pendientes, deudores, productosTop, ingresosMes] =
+      const [ventasHoy, pendientes, deudores, productosTop, ingresosMes,
+             ventasSemana, pedidosPorEstado, stockBajo] =
         await Promise.all([
           pool.query(
             `SELECT COALESCE(SUM(monto_total), 0) AS total
@@ -37,10 +38,32 @@ const DashboardController = {
              LIMIT 10`
           ),
           pool.query(
-            `SELECT COALESCE(SUM(monto_total), 0) AS total
+            `SELECT COALESCE(SUM(monto_total)::float, 0) AS total
              FROM pedidos
              WHERE estado IN ('entregado','completado')
                AND TO_CHAR(fecha_entrega, 'YYYY-MM') = TO_CHAR(CURRENT_DATE, 'YYYY-MM')`
+          ),
+          pool.query(
+            `SELECT fecha_entrega::date AS dia,
+                    COALESCE(SUM(monto_total)::float, 0) AS total
+             FROM pedidos
+             WHERE estado IN ('entregado','completado')
+               AND fecha_entrega >= CURRENT_DATE - INTERVAL '6 days'
+             GROUP BY fecha_entrega::date
+             ORDER BY dia`
+          ),
+          pool.query(
+            `SELECT estado, COUNT(*)::int AS count
+             FROM pedidos
+             GROUP BY estado
+             ORDER BY count DESC`
+          ),
+          pool.query(
+            `SELECT idproducto, nombre, cantidad
+             FROM productos
+             WHERE cantidad < 10 AND estado = true
+             ORDER BY cantidad
+             LIMIT 20`
           ),
         ]);
 
@@ -53,6 +76,9 @@ const DashboardController = {
         },
         productos_top: productosTop.rows,
         ingresos_mes: parseFloat(ingresosMes.rows[0].total) || 0,
+        ventas_semana: ventasSemana.rows,
+        pedidos_por_estado: pedidosPorEstado.rows,
+        stock_bajo: stockBajo.rows,
       });
     } catch (error) {
       console.error('Error en dashboard:', error);

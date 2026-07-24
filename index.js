@@ -30,6 +30,7 @@ const reporteGeneral = require('./models/reporteGeneral');
 const reporteComisiones = require('./models/reporteComisiones');
 const configRoutes = require('./routes/configRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
+const reconciliacionRoutes = require('./routes/reconciliacionRoutes');
 
 const app = express();
 
@@ -83,6 +84,7 @@ app.use('/api/gastos', gastosDiaRoutes);
 app.use('/api/contratos', contratoRoutes);
 app.use('/api/config', configRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/reconciliacion', reconciliacionRoutes);
 
 app.use('/api', reporteRouter);
 app.use('/api', reporteMes);

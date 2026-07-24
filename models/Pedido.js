@@ -639,6 +639,8 @@ async getAssignedOrdersByDriver(conductor_id) {
        JOIN usuarios u ON u.id = p.usuario_id
        WHERE p.id_conductor = $1
          AND COALESCE(u.su, false) = false
+         AND p.estado IN ('asignado', 'parcial', 'pagado')
+         AND p.fecha_creacion::date = CURRENT_DATE
        ORDER BY p.id DESC`,
       [conductor_id]
     );

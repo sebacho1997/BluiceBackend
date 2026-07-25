@@ -220,20 +220,17 @@ async updateProductCantidadInPedido(pedido_id, pedidoproducto_id, nuevaCantidad)
   }
 },
 
-async getClientesDeudores() {
-  console.log("entro al model de clientes deudores");
+  async getClientesDeudores() {
     try {
-      const query = `
-        SELECT u.id AS usuario_id, u.nombre, u.email
-        FROM usuarios u
-        JOIN pedidos p ON u.id = p.usuario_id
-        WHERE p.monto_pendiente > 0
-          AND COALESCE(u.su, false) = false
-        GROUP BY u.id
-        ORDER BY u.nombre
-      `;
-      const result = await pool.query(query);
-      console.log("deudores: "+ result.rows);
+      const result = await pool.query(
+        `SELECT u.id AS usuario_id, u.nombre, u.email, u.telefono
+         FROM usuarios u
+         JOIN pedidos p ON u.id = p.usuario_id
+         WHERE p.monto_pendiente > 0
+           AND COALESCE(u.su, false) = false
+         GROUP BY u.id
+         ORDER BY u.nombre`
+      );
       return result.rows;
     } catch (err) {
       console.error('Error en ClientesDeudoresModel:', err);
@@ -241,13 +238,22 @@ async getClientesDeudores() {
     }
   },
 
-  // ================= Agregar pago parcial =================
   async agregarPago(pedido_id, metodo_pago, monto, comprobante, comprobante_id) {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
 
-      // Insertar pago
+      const pedidoRes = await client.query(
+        `SELECT monto_total, monto_pendiente FROM pedidos WHERE id = $1 FOR UPDATE`,
+        [pedido_id]
+      );
+      if (pedidoRes.rows.length === 0) throw new Error('Pedido no encontrado');
+
+      const pendiente = parseFloat(pedidoRes.rows[0].monto_pendiente) || 0;
+      if (monto > pendiente) {
+        throw new Error(`El monto (Bs ${monto}) excede el pendiente (Bs ${pendiente})`);
+      }
+
       await client.query(
         `INSERT INTO pagos_pedido (pedido_id, metodo_pago, monto_pagado, comprobante, comprobante_id)
          VALUES ($1,$2,$3,$4,$5)`,
@@ -259,7 +265,7 @@ async getClientesDeudores() {
     } catch (error) {
       await client.query('ROLLBACK');
       console.error('Error al agregar pago:', error);
-      throw new Error('No se pudo agregar el pago');
+      throw error;
     } finally {
       client.release();
     }
@@ -471,18 +477,34 @@ async getPendingWithoutDriver() {
   },
 
   async assignConductor(pedidoId, id_conductor) {
-  try {
-    const result = await pool.query(
-      `UPDATE pedidos SET id_conductor = $1,estado=$2 WHERE id = $3 RETURNING *`,
-      [id_conductor,"asignado", pedidoId]
-    );
-    console.log("id_conductor de model:", id_conductor);
-    return result.rows[0];
-  } catch (error) {
-    console.error('Error al asignar conductor:', error);
-    throw new Error('No se pudo asignar el conductor');
-  }
-},
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      const pedidoRes = await client.query(
+        `SELECT id, estado, id_conductor FROM pedidos WHERE id = $1 FOR UPDATE`,
+        [pedidoId]
+      );
+      if (pedidoRes.rows.length === 0) throw new Error('Pedido no encontrado');
+      if (pedidoRes.rows[0].id_conductor) {
+        throw new Error('El pedido ya tiene un conductor asignado');
+      }
+
+      const result = await client.query(
+        `UPDATE pedidos SET id_conductor = $1, estado = $2 WHERE id = $3 RETURNING *`,
+        [id_conductor, "asignado", pedidoId]
+      );
+
+      await client.query('COMMIT');
+      return result.rows[0];
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('Error al asignar conductor:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  },
   async getPendingOrders() {
   try {
     const result = await pool.query(

@@ -29,7 +29,7 @@ router.get('/estado/:estado', authMiddleware, pedidoController.obtenerPedidosPor
 
 router.post('/:id/pagos', authMiddleware, uploadComprobantes.single('comprobante'), pedidoController.agregarPago);
 router.get('/:pedido_id/pagos', authMiddleware, pedidoController.obtenerPagos);
-router.put('/:pago_id', authMiddleware, uploadComprobantes.single('comprobante'), pedidoController.editarPago);
+router.put('/pagos/:pago_id', authMiddleware, uploadComprobantes.single('comprobante'), pedidoController.editarPago);
 // Actualizar estado del pedido
 router.put('/:id/estado', authMiddleware, pedidoController.actualizarEstado);
 

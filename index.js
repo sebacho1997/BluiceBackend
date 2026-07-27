@@ -32,6 +32,7 @@ const configRoutes = require('./routes/configRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const reconciliacionRoutes = require('./routes/reconciliacionRoutes');
 const excelRoutes = require('./routes/excelRoutes');
+const reciboImpresoRoutes = require('./routes/reciboImpresoRoutes');
 
 const app = express();
 
@@ -87,6 +88,7 @@ app.use('/api/config', configRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/reconciliacion', reconciliacionRoutes);
 app.use('/api/excel', excelRoutes);
+app.use('/api/recibos', reciboImpresoRoutes);
 
 app.use('/api', reporteRouter);
 app.use('/api', reporteMes);

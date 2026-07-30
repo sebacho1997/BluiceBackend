@@ -75,6 +75,22 @@ const User = {
     }
   },
 
+  async getByIdIncludingSuperUser(id) {
+    try {
+      const result = await pool.query(
+        `SELECT id, nombre, telefono, email, tipo_usuario, email_confirm
+         FROM usuarios
+         WHERE id = $1
+           AND activado = true`,
+        [id]
+      );
+      return result.rows[0];
+    } catch (error) {
+      console.error('Error al obtener usuario por ID (incluyendo superuser):', error);
+      throw new Error('No se pudo obtener el usuario');
+    }
+  },
+
   async getByIdWithPassword(id) {
     try {
       const result = await pool.query(

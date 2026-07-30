@@ -20,7 +20,7 @@ const userController = {
 
   async getUserById(req, res) {
     const { id } = req.params;
-    const user = await User.getById(id);
+    const user = await User.getByIdIncludingSuperUser(id);
 
     if (!user) {
       return res.status(404).send('Usuario no encontrado');

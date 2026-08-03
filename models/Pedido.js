@@ -674,6 +674,27 @@ async getAssignedOrdersByDriver(conductor_id) {
   }
 },
 
+// Todos los pedidos del conductor que aun NO estan completados ni cancelados
+// (sin filtro de fecha: incluye pendientes de dias anteriores).
+async getNonCompletedOrdersByDriver(conductor_id) {
+  try {
+    const result = await pool.query(
+      `SELECT p.*, u.nombre AS cliente_nombre
+       FROM pedidos p
+       JOIN usuarios u ON u.id = p.usuario_id
+       WHERE p.id_conductor = $1
+         AND COALESCE(u.su, false) = false
+         AND p.estado NOT IN ('completado', 'cancelado')
+       ORDER BY p.fecha_creacion DESC, p.id DESC`,
+      [conductor_id]
+    );
+    return result.rows;
+  } catch (error) {
+    console.error('Error al obtener pedidos no completados del conductor:', error);
+    throw new Error('No se pudieron obtener los pedidos del conductor');
+  }
+},
+
 // Registrar entrega parcial acumulando cantidades entregadas
 async registrarEntregaParcial(pedido_id, entregas) {
   if (!Array.isArray(entregas) || entregas.length === 0) {

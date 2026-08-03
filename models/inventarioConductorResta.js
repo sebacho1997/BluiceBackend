@@ -33,8 +33,9 @@ const InventarioConductorResta = {
         FROM inventario_conductor_resta
         WHERE conductor_id = $1
           AND DATE(fecha_creacion) = CURRENT_DATE
+          AND estado = $2
       `;
-      const result = await pool.query(query, [conductorId]);
+      const result = await pool.query(query, [conductorId, 'creado']);
       return Number(result.rows[0].count) > 0;
     } catch (error) {
       console.error('Error en InventarioConductorResta.existeInventarioHoy:', error);
@@ -80,7 +81,12 @@ const InventarioConductorResta = {
   async obtenerDetalleInventario(inventarioId) {
     try {
       const res = await pool.query(
-        'SELECT * FROM inventario_conductor_detalle_resta WHERE inventario_id = $1',
+        `SELECT d.id AS detalle_id, d.inventario_id, d.producto_id,
+                p.nombre AS producto_nombre, d.cantidad
+         FROM inventario_conductor_detalle_resta d
+         JOIN productos p ON p.idproducto = d.producto_id
+         WHERE d.inventario_id = $1
+         ORDER BY d.id ASC`,
         [inventarioId]
       );
       return res.rows;

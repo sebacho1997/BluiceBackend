@@ -240,6 +240,20 @@ async obtenerPedidosAsignados(req, res) {
   }
 },
 
+async obtenerPedidosNoCompletadosConductor(req, res) {
+  try {
+    const { conductor_id } = req.params;
+    if (req.user.tipo_usuario !== 'administrador' && String(req.user.id) !== conductor_id) {
+      return res.status(403).json({ error: 'No autorizado' });
+    }
+    const pedidos = await Pedido.getNonCompletedOrdersByDriver(conductor_id);
+    res.json(pedidos);
+  } catch (error) {
+    console.error('Error al obtener pedidos no completados del conductor:', error);
+    res.status(500).json({ error: 'No se pudieron obtener los pedidos del conductor' });
+  }
+},
+
   // Obtener pedido por ID
   async obtenerPedidoPorId(req, res) {
     try {

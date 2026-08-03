@@ -33,6 +33,9 @@ router.put('/pagos/:pago_id', authMiddleware, uploadComprobantes.single('comprob
 // Actualizar estado del pedido
 router.put('/:id/estado', authMiddleware, pedidoController.actualizarEstado);
 
+// Obtener todos los pedidos NO completados/cancelados de un conductor (cualquier dia)
+router.get('/conductor/:conductor_id/nocompletados', authMiddleware, pedidoController.obtenerPedidosNoCompletadosConductor);
+
 // Obtener pedidos asignados a un conductor
 router.get('/conductor/:conductor_id', authMiddleware, pedidoController.obtenerPedidosAsignados);
 

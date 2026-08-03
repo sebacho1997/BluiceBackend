@@ -12,7 +12,10 @@ const PedidoProducto = {
 
   async getByPedido(pedido_id) {
     const result = await pool.query(
-      'SELECT * FROM pedido_productos WHERE pedido_id = $1',
+      `SELECT pp.*, p.nombre, p.preciounitario
+       FROM pedido_productos pp
+       JOIN productos p ON p.idproducto = pp.producto_id
+       WHERE pp.pedido_id = $1`,
       [pedido_id]
     );
     return result.rows;

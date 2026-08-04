@@ -4,6 +4,17 @@ const InventarioConductor = {
   // Métodos originales
   async crearInventario(conductorId, productos) {
     try {
+      // Guard anti-duplicados: solo puede existir un inventario 'creado'
+      // (abierto) por conductor. Si ya hay uno abierto, no se crea otro.
+      const abierto = await pool.query(
+        'SELECT id FROM inventario_conductor WHERE conductor_id = $1 AND estado = $2',
+        [conductorId, 'creado']
+      );
+      if (abierto.rows.length > 0) {
+        console.log('Ya existe un inventario abierto, no se crea otro:', abierto.rows[0].id);
+        return null;
+      }
+
       const res = await pool.query(
         'INSERT INTO inventario_conductor (conductor_id) VALUES ($1) RETURNING id, fecha_creacion',
         [conductorId]
@@ -60,7 +71,7 @@ const InventarioConductor = {
   async obtenerInventarios(conductorId) {
     try {
       const res = await pool.query(
-        'SELECT * FROM inventario_conductor WHERE conductor_id = $1 ORDER BY fecha_creacion DESC',
+        'SELECT * FROM inventario_conductor WHERE conductor_id = $1 ORDER BY id ASC',
         [conductorId]
       );
       return res.rows;
@@ -136,7 +147,7 @@ const InventarioConductor = {
       const res = await pool.query(
         `SELECT * FROM devolucion_conductor 
          WHERE conductor_id = $1 
-         ORDER BY fecha_creacion DESC`,
+         ORDER BY id ASC`,
         [conductorId]
       );
       return res.rows;

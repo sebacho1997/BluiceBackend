@@ -28,6 +28,7 @@ const clienteContratoPersonalizado = require('./models/clienteContratoPersonaliz
 const initAuthTables = require('./config/initAuthTables');
 const reporteGeneral = require('./models/reporteGeneral');
 const reporteComisiones = require('./models/reporteComisiones');
+const reporteListaClientes = require('./models/reporteListaClientes');
 const configRoutes = require('./routes/configRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const reconciliacionRoutes = require('./routes/reconciliacionRoutes');
@@ -103,6 +104,7 @@ app.use('/api', reporteClienteMes);
 app.use('/api', reporteClientePersonalizado);
 app.use('/api', reporteGeneral);
 app.use('/api', reporteComisiones);
+app.use('/api', reporteListaClientes);
 
 const PORT = process.env.PORT || 5000;
 

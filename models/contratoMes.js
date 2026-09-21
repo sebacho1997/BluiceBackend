@@ -1,31 +1,32 @@
 const express = require('express');
 const router = express.Router();
-const PdfPrinter = require('pdfmake');
 const pool = require('../config/db');
-const { buildReportFilename } = require('./reportPdfUtils');
+const {
+  createPrinter,
+  buildReportFilename,
+  formatCurrency,
+  formatDate,
+  buildSummaryTable,
+  buildDataTable,
+  buildDocDefinition,
+  sectionTitle
+} = require('./reportPdfUtils');
 
 router.get('/reporte-consumos-mes/:conductorId/:anio/:mes', async (req, res) => {
-  const { conductorId, anio, mes } = req.params; // anio: 2025, mes: 9
+  const { conductorId, anio, mes } = req.params;
+  const printer = createPrinter();
 
-  const fonts = {
-    Roboto: {
-      normal: 'Helvetica',
-      bold: 'Helvetica-Bold',
-      italics: 'Helvetica-Oblique',
-      bolditalics: 'Helvetica-BoldOblique'
-    }
-  };
-  const printer = new PdfPrinter(fonts);
+  if (!/^\d{4}$/.test(anio) || !/^\d{1,2}$/.test(mes)) {
+    return res.status(400).send('Formato de anio/mes invalido');
+  }
 
   try {
-    // Nombre del conductor
     const conductorRes = await pool.query(
       `SELECT nombre FROM usuarios WHERE id = $1 AND tipo_usuario = 'conductor'`,
       [conductorId]
     );
     const conductorNombre = conductorRes.rows.length ? conductorRes.rows[0].nombre : 'Desconocido';
 
-    // Contratos asignados al conductor
     const contratosRes = await pool.query(
       `SELECT id AS contrato_id, cliente_id FROM contratos WHERE conductor_id = $1`,
       [conductorId]
@@ -33,7 +34,6 @@ router.get('/reporte-consumos-mes/:conductorId/:anio/:mes', async (req, res) => 
     const contratoIds = contratosRes.rows.map(c => c.contrato_id);
     if (!contratoIds.length) return res.status(404).send('No hay contratos asignados a este conductor');
 
-    // Consumos entregados en el mes específico
     const consumosRes = await pool.query(
       `SELECT cc.id AS consumo_id, cc.contrato_id, cc.monto_consumido, cc.fecha_entrega,
               u.nombre AS cliente_nombre
@@ -52,7 +52,6 @@ router.get('/reporte-consumos-mes/:conductorId/:anio/:mes', async (req, res) => 
     const consumoIds = consumos.map(c => c.consumo_id);
     if (!consumoIds.length) return res.status(404).send('No hay consumos entregados en este mes');
 
-    // Detalle de productos por consumo
     const detalleRes = await pool.query(
       `SELECT cd.consumo_id, p.idproducto AS producto_id, p.nombre AS producto_nombre, cd.cantidad
        FROM consumo_detalle cd
@@ -67,89 +66,128 @@ router.get('/reporte-consumos-mes/:conductorId/:anio/:mes', async (req, res) => 
       detalleMap[d.consumo_id].push(d);
     });
 
-    // Construir contenido del PDF
     let totalProductos = {};
-    const contentConsumidos = [];
-    let contratoAnterior = null;
+    let totalUnidades = 0;
+    let totalMontoConsumido = 0;
+    const consumosPorContrato = {};
 
     consumos.forEach(c => {
-      // Encabezado para cada contrato nuevo
-      if (c.contrato_id !== contratoAnterior) {
-        contentConsumidos.push({
-          text: `Contrato ID: ${c.contrato_id} | Cliente: ${c.cliente_nombre}`,
-          style: 'contratoHeader',
-          margin: [0, 10, 0, 5]
-        });
-        contratoAnterior = c.contrato_id;
+      if (!consumosPorContrato[c.contrato_id]) {
+        consumosPorContrato[c.contrato_id] = {
+          cliente_nombre: c.cliente_nombre,
+          consumos: [],
+          montoTotal: 0,
+          unidadesTotal: 0
+        };
       }
 
       const detalles = detalleMap[c.consumo_id] || [];
+      let montoConsumo = 0;
+      let unidadesConsumo = 0;
 
       detalles.forEach(d => {
         if (!totalProductos[d.producto_nombre]) totalProductos[d.producto_nombre] = 0;
         totalProductos[d.producto_nombre] += parseInt(d.cantidad);
+        totalUnidades += parseInt(d.cantidad);
+        unidadesConsumo += parseInt(d.cantidad);
       });
 
-      const productosTable = {
-        table: {
-          widths: ['*', 80],
-          body: [
-            [{ text: 'Producto', style: 'tableHeader' }, { text: 'Cantidad', style: 'tableHeader' }],
-            ...detalles.map(d => [d.producto_nombre, d.cantidad.toString()])
-          ]
-        },
-        layout: 'lightHorizontalLines',
-        margin: [0, 5, 0, 10]
-      };
+      montoConsumo = parseFloat(c.monto_consumido || 0);
+      totalMontoConsumido += montoConsumo;
 
-      contentConsumidos.push({
-        stack: [
-          { text: `Consumo ID: ${c.consumo_id} | Fecha: ${new Date(c.fecha_entrega).toLocaleDateString()}`, style: 'consumoId' },
-          productosTable,
-          { text: `Monto Consumido: Bs${c.monto_consumido}`, style: 'totalesConsumo' },
-          { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 780, y2: 0, lineWidth: 1, lineColor: '#CCCCCC' }], margin: [0, 5, 0, 5] }
-        ]
+      consumosPorContrato[c.contrato_id].consumos.push({
+        consumo_id: c.consumo_id,
+        fecha_entrega: c.fecha_entrega,
+        monto_consumido: montoConsumo,
+        unidades: unidadesConsumo,
+        detalles: detalles
       });
+      consumosPorContrato[c.contrato_id].montoTotal += montoConsumo;
+      consumosPorContrato[c.contrato_id].unidadesTotal += unidadesConsumo;
     });
 
-    // Tabla resumen de productos totales
-    const resumenTable = {
-      table: {
-        widths: ['*', 80],
-        body: [
-          [{ text: 'Producto', style: 'tableHeader' }, { text: 'Cantidad Total', style: 'tableHeader' }],
-          ...Object.entries(totalProductos).map(([nombre, cant]) => [nombre, cant.toString()])
-        ]
-      },
-      layout: 'lightHorizontalLines',
-      margin: [0, 5, 0, 10]
-    };
+    const contratosRows = Object.entries(consumosPorContrato)
+      .sort((a, b) => b[1].montoTotal - a[1].montoTotal)
+      .map(([contratoId, data]) => [
+        `#${contratoId}`,
+        data.cliente_nombre,
+        String(data.consumos.length),
+        String(data.unidadesTotal),
+        formatCurrency(data.montoTotal)
+      ]);
 
-    const docDefinition = {
-      pageSize: 'A4',
-      pageOrientation: 'landscape',
-      pageMargins: [40, 40, 40, 40],
-      content: [
-        { text: `Reporte Mensual de Entregas - ${mes}/${anio}`, style: 'header', alignment: 'center' },
-        { text: `Conductor: ${conductorNombre}`, style: 'subHeader', alignment: 'center' },
-        '\n',
-        ...contentConsumidos,
-        { text: 'Resumen Total de Productos', style: 'header', margin: [0, 10, 0, 5] },
-        resumenTable
+    const topProductosRows = Object.entries(totalProductos)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([nombre, cant]) => [nombre, String(cant)]);
+
+    const content = [
+      sectionTitle('Resumen del mes'),
+      buildSummaryTable([
+        { label: 'Consumos realizados', value: String(consumos.length) },
+        { label: 'Unidades entregadas', value: String(totalUnidades) },
+        { label: 'Monto total consumido', value: formatCurrency(totalMontoConsumido), tone: 'warning' },
+        { label: 'Contratos activos', value: String(Object.keys(consumosPorContrato).length) }
+      ], 4),
+      sectionTitle('Resumen por contrato'),
+      buildDataTable(
+        ['Contrato', 'Cliente', 'Consumos', 'Unidades', 'Monto'],
+        contratosRows.length ? contratosRows : [['Sin datos', '-', '-', '-', '-']],
+        [60, '*', 65, 65, 90]
+      ),
+      sectionTitle('Productos mas entregados'),
+      buildDataTable(
+        ['Producto', 'Cantidad'],
+        topProductosRows.length ? topProductosRows : [['Sin datos', '-']],
+        ['*', 80]
+      )
+    ];
+
+    Object.entries(consumosPorContrato)
+      .sort((a, b) => a[0] - b[0])
+      .forEach(([contratoId, data]) => {
+        content.push(sectionTitle(`Contrato #${contratoId} - ${data.cliente_nombre}`));
+
+        const consumoRows = data.consumos.map(c => [
+          formatDate(c.fecha_entrega),
+          `#${c.consumo_id}`,
+          String(c.unidades),
+          formatCurrency(c.monto_consumido)
+        ]);
+
+        content.push(buildDataTable(
+          ['Fecha', 'Consumo', 'Unidades', 'Monto'],
+          consumoRows,
+          [70, 55, 60, 90]
+        ));
+
+        data.consumos.forEach(c => {
+          if (c.detalles.length) {
+            const detRows = c.detalles.map(d => [
+              d.producto_nombre,
+              String(d.cantidad)
+            ]);
+            content.push(buildDataTable(
+              ['Producto', 'Cantidad'],
+              detRows,
+              ['*', 80]
+            ));
+          }
+        });
+      });
+
+    const docDefinition = buildDocDefinition({
+      title: 'Reporte Mensual de Consumos',
+      subtitleLines: [
+        `Conductor: ${conductorNombre}`,
+        `Periodo: ${mes}/${anio}`
       ],
-      styles: {
-        header: { fontSize: 20, bold: true, color: '#2E86C1' },
-        subHeader: { fontSize: 14, italics: true, color: '#555555' },
-        contratoHeader: { fontSize: 14, bold: true, color: '#D35400', margin: [0, 5, 0, 5] },
-        consumoId: { fontSize: 10, color: '#555555', margin: [0, 0, 0, 5] },
-        totalesConsumo: { fontSize: 10, margin: [0, 2, 0, 5] },
-        tableHeader: { bold: true, fillColor: '#D6EAF8' }
-      }
-    };
+      content
+    });
 
     const pdfDoc = printer.createPdfKitDocument(docDefinition);
-    let chunks = [];
-    pdfDoc.on('data', chunk => chunks.push(chunk));
+    const chunks = [];
+    pdfDoc.on('data', (chunk) => chunks.push(chunk));
     pdfDoc.on('end', () => {
       const result = Buffer.concat(chunks);
       res.setHeader('Content-Type', 'application/pdf');
@@ -158,14 +196,13 @@ router.get('/reporte-consumos-mes/:conductorId/:anio/:mes', async (req, res) => 
         `attachment; filename=${buildReportFilename({
           entityType: 'conductor',
           subjectName: conductorNombre,
-          reportType: 'mensual',
+          reportType: 'consumos_mensual',
           reportDate: `${anio}-${String(mes).padStart(2, '0')}`
         })}`
       );
       res.send(result);
     });
     pdfDoc.end();
-
   } catch (err) {
     console.error(err);
     res.status(500).send('Error generando PDF de consumos del mes');

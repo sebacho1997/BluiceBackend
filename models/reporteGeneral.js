@@ -19,6 +19,7 @@ async function generarReporteGeneral({ res, reportType, reportDateForFilename, s
   try {
     const pedidosRes = await pool.query(
       `SELECT p.id AS pedido_id, p.nro_pedido, p.estado, p.direccion, p.info_extra,
+       p.tipo,
        u.nombre AS cliente_nombre,
        CASE
          WHEN p.usuario_id = 31 AND p.id_conductor = 30 THEN 'VENTA LOCAL'
@@ -183,7 +184,7 @@ WHERE COALESCE(u.su, false) = false
             buildOrderDetailBlock({
               title: `${p.conductor_nombre || 'Sin conductor'} | ${p.cliente_nombre} | Pedido #${p.nro_pedido || p.pedido_id}`,
               metaLines: [
-                `Fecha ${formatDate(p.fecha_entrega)} | Estado ${p.estado || '-'}`,
+                `Fecha ${formatDate(p.fecha_entrega)} | Estado ${p.estado || '-'} | Tipo ${(p.tipo || 'particular').toUpperCase()}`,
                 p.direccion ? `Direccion: ${p.direccion}` : '',
                 p.info_extra ? `Referencia: ${p.info_extra}` : ''
               ],

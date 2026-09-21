@@ -30,7 +30,7 @@ router.get('/reporte-detalle-mes/:conductorId/:mes', async (req, res) => {
 
     const pedidosRes = await pool.query(
       `SELECT p.id AS pedido_id, p.nro_pedido, p.estado, p.direccion, p.info_extra,
-              u.nombre AS cliente_nombre, p.fecha_entrega::date AS fecha_entrega
+              p.tipo, u.nombre AS cliente_nombre, p.fecha_entrega::date AS fecha_entrega
        FROM pedidos p
        JOIN usuarios u ON u.id = p.usuario_id AND u.tipo_usuario = 'cliente'
        WHERE p.id_conductor = $1
@@ -184,7 +184,7 @@ router.get('/reporte-detalle-mes/:conductorId/:mes', async (req, res) => {
             buildOrderDetailBlock({
               title: `${pedido.cliente_nombre} | Pedido #${pedido.nro_pedido || pedido.pedido_id}`,
               metaLines: [
-                `Fecha ${formatDate(pedido.fecha_entrega)} | Estado ${pedido.estado || '-'}`,
+                `Fecha ${formatDate(pedido.fecha_entrega)} | Estado ${pedido.estado || '-'} | Tipo ${(pedido.tipo || 'particular').toUpperCase()}`,
                 pedido.direccion ? `Direccion: ${pedido.direccion}` : '',
                 pedido.info_extra ? `Referencia: ${pedido.info_extra}` : ''
               ],

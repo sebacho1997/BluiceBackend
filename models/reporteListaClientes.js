@@ -1,10 +1,15 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/db');
-const { createPrinter, buildReportFilename } = require('./reportPdfUtils');
+const {
+  createPrinter,
+  buildReportFilename,
+  buildSummaryTable,
+  buildDataTable,
+  buildDocDefinition,
+  sectionTitle
+} = require('./reportPdfUtils');
 
-// GET /api/reporte-lista-clientes
-// PDF con todos los clientes: nombre, teléfono, email y dirección(es).
 router.get('/reporte-lista-clientes', async (req, res) => {
   const printer = createPrinter();
 
@@ -22,7 +27,7 @@ router.get('/reporte-lista-clientes', async (req, res) => {
                 AND direccion <> ''
             ) d
           ),
-          'Sin dirección registrada'
+          'Sin direccion registrada'
         ) AS direcciones
       FROM usuarios u
       WHERE u.tipo_usuario = 'cliente'
@@ -36,47 +41,26 @@ router.get('/reporte-lista-clientes', async (req, res) => {
       return res.status(404).send('No hay clientes registrados');
     }
 
-    const tableBody = [
-      [
-        { text: '#', style: 'tableHeader' },
-        { text: 'Nombre', style: 'tableHeader' },
-        { text: 'Teléfono', style: 'tableHeader' },
-        { text: 'Email', style: 'tableHeader' },
-        { text: 'Dirección', style: 'tableHeader' },
-      ],
-      ...clientes.map((c, i) => [
-        (i + 1).toString(),
-        c.nombre || '-',
-        c.telefono || '-',
-        c.email || '-',
-        c.direcciones || 'Sin dirección registrada',
-      ]),
-    ];
+    const clientesRows = clientes.map((c, i) => [
+      String(i + 1),
+      c.nombre || '-',
+      c.telefono || '-',
+      c.email || '-',
+      c.direcciones || 'Sin direccion registrada'
+    ]);
 
-    const docDefinition = {
-      pageSize: 'A4',
-      pageOrientation: 'landscape',
-      pageMargins: [40, 40, 40, 40],
+    const docDefinition = buildDocDefinition({
+      title: 'Lista de Clientes',
+      subtitleLines: [`Total: ${clientes.length} cliente(s)`],
       content: [
-        { text: 'Lista de Clientes', style: 'header', alignment: 'center' },
-        {
-          text: `Fecha: ${new Date().toLocaleDateString('es-BO')} | Total: ${clientes.length} cliente(s)\n\n`,
-          alignment: 'center',
-        },
-        {
-          table: {
-            headerRows: 1,
-            widths: [30, 150, 90, 170, '*'],
-            body: tableBody,
-          },
-          layout: 'lightHorizontalLines',
-        },
-      ],
-      styles: {
-        header: { fontSize: 20, bold: true, color: '#2E86C1' },
-        tableHeader: { bold: true, fillColor: '#D6EAF8' },
-      },
-    };
+        sectionTitle('Listado completo'),
+        buildDataTable(
+          ['#', 'Nombre', 'Telefono', 'Email', 'Direccion'],
+          clientesRows,
+          [30, 140, 90, 160, '*']
+        )
+      ]
+    });
 
     const pdfDoc = printer.createPdfKitDocument(docDefinition);
     const chunks = [];
@@ -90,7 +74,7 @@ router.get('/reporte-lista-clientes', async (req, res) => {
           entityType: 'clientes',
           subjectName: 'lista',
           reportType: 'general',
-          reportDate: new Date(),
+          reportDate: new Date()
         })}`
       );
       res.send(result);

@@ -1,106 +1,197 @@
-const PdfPrinter = require('pdfmake');
-const ReporteModel = require('../models/ReporteModel');
-const { buildReportFilename } = require('../models/reportPdfUtils');
+const pool = require('../config/db');
+const {
+  createPrinter,
+  buildReportFilename,
+  formatCurrency,
+  formatDate,
+  buildSummaryTable,
+  buildDataTable,
+  buildOrderDetailBlock,
+  buildDocDefinition,
+  sectionTitle
+} = require('../models/reportPdfUtils');
 
 class ReporteController {
   static async generarReporte(req, res) {
     const { conductorId } = req.params;
-    console.log('Conductor ID:', conductorId);
-
-    const fonts = {
-      Roboto: {
-        normal: 'Helvetica',
-        bold: 'Helvetica-Bold',
-        italics: 'Helvetica-Oblique',
-        bolditalics: 'Helvetica-BoldOblique'
-      }
-    };
-    const printer = new PdfPrinter(fonts);
+    const printer = createPrinter();
 
     try {
-      const conductor = await ReporteModel.getConductorById(conductorId);
-      const conductorNombre = conductor ? conductor.nombre : 'Desconocido';
+      const conductorRes = await pool.query(
+        `SELECT nombre FROM usuarios WHERE id = $1 AND tipo_usuario = 'conductor'`,
+        [conductorId]
+      );
+      const conductorNombre = conductorRes.rows.length ? conductorRes.rows[0].nombre : 'Desconocido';
 
-      const pedidos = await ReporteModel.getPedidosDia(conductorId);
+      const pedidosRes = await pool.query(
+        `SELECT p.id AS pedido_id, p.nro_pedido, p.estado, p.direccion, p.info_extra,
+                p.tipo, u.nombre AS cliente_nombre, p.fecha_entrega::date AS fecha_entrega
+         FROM pedidos p
+         JOIN usuarios u ON u.id = p.usuario_id AND u.tipo_usuario = 'cliente'
+         WHERE p.id_conductor = $1
+           AND COALESCE(u.su, false) = false
+           AND p.estado IN ('entregado', 'completado')
+           AND p.fecha_entrega::date = CURRENT_DATE
+         ORDER BY p.fecha_entrega, p.id`,
+        [conductorId]
+      );
+
+      const pedidos = pedidosRes.rows;
       if (!pedidos.length) return res.status(404).send('No hay pedidos para este conductor hoy');
 
       const pedidoIds = pedidos.map(p => p.pedido_id);
-      const productosMap = await ReporteModel.getProductosPorPedidos(pedidoIds);
-      const pagosMap = await ReporteModel.getPagosPorPedidos(pedidoIds);
 
-      const contentPedidos = pedidos.map(p => {
-        const productos = productosMap[p.pedido_id] || [];
-        const pago = pagosMap[p.pedido_id] || { efectivo: 0, qr: 0 };
-        const totalPedido = productos.reduce((sum, pr) => sum + parseFloat(pr.subtotal), 0);
-        const pendientePedido = Math.max(totalPedido - (pago.efectivo + pago.qr), 0);
+      const productosRes = await pool.query(
+        `SELECT pd.pedido_id, pr.nombre AS producto_nombre, pd.cantidad, pd.preciounitario,
+                (pd.cantidad * pd.preciounitario) AS subtotal
+         FROM pedidoproducto pd
+         JOIN productos pr ON pr.idproducto = pd.producto_id
+         WHERE pd.pedido_id = ANY($1)`,
+        [pedidoIds]
+      );
 
-        const productosTable = {
-          table: {
-            widths: ['*', 60, 80, 80],
-            body: [
-              [
-                { text: 'Producto', style: 'tableHeader' },
-                { text: 'Cantidad', style: 'tableHeader' },
-                { text: 'Precio Unitario', style: 'tableHeader' },
-                { text: 'Subtotal', style: 'tableHeader' }
-              ],
-              ...productos.map(pr => [
-                pr.producto_nombre,
-                pr.cantidad.toString(),
-                pr.preciounitario.toString(),
-                pr.subtotal.toString()
-              ])
-            ]
-          },
-          layout: 'lightHorizontalLines',
-          margin: [0, 5, 0, 10]
+      const pagosRes = await pool.query(
+        `SELECT pedido_id, metodo_pago, SUM(monto_pagado) AS total
+         FROM pagos_pedido
+         WHERE pedido_id = ANY($1)
+         GROUP BY pedido_id, metodo_pago`,
+        [pedidoIds]
+      );
+
+      const gastosRes = await pool.query(
+        `SELECT COALESCE(SUM(monto), 0) AS total_gastos
+         FROM gastos_dia
+         WHERE id_conductor = $1
+           AND fecha_gasto::date = CURRENT_DATE`,
+        [conductorId]
+      );
+
+      const productosMap = {};
+      const pagosMap = {};
+      const topProductos = {};
+
+      productosRes.rows.forEach((row) => {
+        if (!productosMap[row.pedido_id]) productosMap[row.pedido_id] = [];
+        const normalized = {
+          producto_nombre: row.producto_nombre,
+          cantidad: Number(row.cantidad || 0),
+          preciounitario: Number(row.preciounitario || 0),
+          subtotal: Number(row.subtotal || 0)
         };
-
-        return {
-          stack: [
-            { text: `Cliente: ${p.cliente_nombre}`, style: 'pedidoCliente' },
-            { text: `Pedido ID: ${p.pedido_id}`, style: 'pedidoId' },
-            productosTable,
-            { text: `Total: $${totalPedido.toString()} | Efectivo: $${pago.efectivo.toString()} | QR: $${pago.qr.toString()} | Pendiente: $${pendientePedido.toString()}`, style: 'totalesPedido' },
-            { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 780, y2: 0, lineWidth: 1, lineColor: '#CCCCCC' }], margin: [0, 5, 0, 5] }
-          ]
-        };
+        productosMap[row.pedido_id].push(normalized);
+        topProductos[row.producto_nombre] = (topProductos[row.producto_nombre] || 0) + normalized.cantidad;
       });
 
-      const docDefinition = {
-        pageSize: 'A4',
-        pageOrientation: 'landscape',
-        pageMargins: [40, 40, 40, 40],
-        content: [
-          { text: 'Reporte Diario de Ventas', style: 'header', alignment: 'center' },
-          { text: `Conductor: ${conductorNombre}`, style: 'subHeader', alignment: 'center' },
-          { text: `Fecha: ${new Date().toLocaleDateString()}\n\n`, alignment: 'center' },
-          ...contentPedidos
+      pagosRes.rows.forEach((row) => {
+        if (!pagosMap[row.pedido_id]) pagosMap[row.pedido_id] = { efectivo: 0, qr: 0, rows: [] };
+        const total = Number(row.total || 0);
+        const metodo = (row.metodo_pago || '').toLowerCase();
+        if (metodo === 'efectivo') pagosMap[row.pedido_id].efectivo = total;
+        if (metodo === 'qr') pagosMap[row.pedido_id].qr = total;
+        pagosMap[row.pedido_id].rows.push([row.metodo_pago || 'Sin metodo', formatCurrency(total)]);
+      });
+
+      const enrichedPedidos = pedidos.map((pedido) => {
+        const productos = productosMap[pedido.pedido_id] || [];
+        const pago = pagosMap[pedido.pedido_id] || { efectivo: 0, qr: 0, rows: [] };
+        const totalPedido = productos.reduce((sum, pr) => sum + pr.subtotal, 0);
+        const pendientePedido = Math.max(totalPedido - (pago.efectivo + pago.qr), 0);
+        const totalUnidades = productos.reduce((sum, pr) => sum + pr.cantidad, 0);
+        return { ...pedido, productos, pago, totalPedido, pendientePedido, totalUnidades };
+      });
+
+      const totalVentas = enrichedPedidos.reduce((sum, p) => sum + p.totalPedido, 0);
+      const totalEfectivo = enrichedPedidos.reduce((sum, p) => sum + p.pago.efectivo, 0);
+      const totalQr = enrichedPedidos.reduce((sum, p) => sum + p.pago.qr, 0);
+      const pendienteCobro = enrichedPedidos.reduce((sum, p) => sum + p.pendientePedido, 0);
+      const totalGastos = Number(gastosRes.rows[0].total_gastos || 0);
+      const totalProductos = enrichedPedidos.reduce((sum, p) => sum + p.totalUnidades, 0);
+      const ticketPromedio = totalVentas / enrichedPedidos.length;
+
+      const topProductosRows = Object.entries(topProductos)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([producto, cantidad]) => [producto, String(cantidad)]);
+
+      const content = [];
+
+      content.push(sectionTitle('Resumen del dia'));
+      content.push(
+        buildSummaryTable([
+          { label: 'Pedidos entregados', value: String(enrichedPedidos.length) },
+          { label: 'Ventas del dia', value: formatCurrency(totalVentas), tone: 'warning' },
+          { label: 'Cobrado', value: formatCurrency(totalEfectivo + totalQr), tone: 'success' },
+          { label: 'Pendiente', value: formatCurrency(pendienteCobro), tone: 'danger' },
+          { label: 'Gastos', value: formatCurrency(totalGastos) },
+          { label: 'Efectivo neto', value: formatCurrency(totalEfectivo - totalGastos), tone: 'success' },
+          { label: 'Productos entregados', value: String(totalProductos) },
+          { label: 'Ticket promedio', value: formatCurrency(ticketPromedio) }
+        ], 4)
+      );
+
+      content.push(sectionTitle('Productos mas movidos'));
+      content.push(
+        buildDataTable(
+          ['Producto', 'Cantidad'],
+          topProductosRows.length ? topProductosRows : [['Sin datos', '-']],
+          ['*', 80]
+        )
+      );
+
+      content.push(sectionTitle('Detalle de pedidos'));
+      enrichedPedidos.forEach((pedido) => {
+        content.push(
+          buildOrderDetailBlock({
+            title: `${pedido.cliente_nombre} | Pedido #${pedido.nro_pedido || pedido.pedido_id}`,
+            metaLines: [
+              `Fecha ${formatDate(pedido.fecha_entrega)} | Estado ${pedido.estado || '-'} | Tipo ${(pedido.tipo || 'particular').toUpperCase()}`,
+              pedido.direccion ? `Direccion: ${pedido.direccion}` : '',
+              pedido.info_extra ? `Referencia: ${pedido.info_extra}` : ''
+            ],
+            productRows: pedido.productos.map((pr) => [
+              pr.producto_nombre,
+              String(pr.cantidad),
+              formatCurrency(pr.preciounitario),
+              formatCurrency(pr.subtotal)
+            ]),
+            paymentRows: pedido.pago.rows,
+            summaryPairs: [
+              { label: 'Items', value: String(pedido.productos.length) },
+              { label: 'Unidades', value: String(pedido.totalUnidades) },
+              { label: 'Total', value: formatCurrency(pedido.totalPedido) },
+              { label: 'Pendiente', value: formatCurrency(pedido.pendientePedido), style: 'dangerText' }
+            ]
+          })
+        );
+      });
+
+      const docDefinition = buildDocDefinition({
+        title: 'Reporte Diario de Conductor',
+        subtitleLines: [
+          `Conductor: ${conductorNombre}`,
+          `Fecha operativa: ${formatDate(new Date())}`
         ],
-        styles: {
-          header: { fontSize: 20, bold: true, color: '#2E86C1' },
-          subHeader: { fontSize: 14, italics: true, color: '#555555' },
-          pedidoCliente: { fontSize: 12, bold: true, color: '#1F618D', margin: [0, 5, 0, 0] },
-          pedidoId: { fontSize: 10, color: '#555555', margin: [0, 0, 0, 5] },
-          totalesPedido: { fontSize: 10, margin: [0, 2, 0, 5] },
-          tableHeader: { bold: true, fillColor: '#D6EAF8' }
-        }
-      };
+        content
+      });
 
       const pdfDoc = printer.createPdfKitDocument(docDefinition);
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader(
-        'Content-Disposition',
-        `attachment; filename=${buildReportFilename({
-          entityType: 'conductor',
-          subjectName: conductorNombre,
-          reportType: 'diario',
-          reportDate: new Date()
-        })}`
-      );
-      pdfDoc.pipe(res);
+      const chunks = [];
+      pdfDoc.on('data', (chunk) => chunks.push(chunk));
+      pdfDoc.on('end', () => {
+        const result = Buffer.concat(chunks);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader(
+          'Content-Disposition',
+          `attachment; filename=${buildReportFilename({
+            entityType: 'conductor',
+            subjectName: conductorNombre,
+            reportType: 'diario',
+            reportDate: new Date()
+          })}`
+        );
+        res.send(result);
+      });
       pdfDoc.end();
-
     } catch (err) {
       console.error(err);
       res.status(500).send('Error generando PDF');

@@ -31,7 +31,7 @@ router.get('/reporte-cliente-mes/:clienteId/:mes', async (req, res) => {
 
     const pedidosRes = await pool.query(
       `SELECT p.id AS pedido_id, p.nro_pedido, p.fecha_entrega::date AS fecha_entrega,
-              p.estado, p.direccion, p.info_extra
+              p.estado, p.direccion, p.info_extra, p.tipo
        FROM pedidos p
        WHERE p.usuario_id = $1
          AND TO_CHAR(p.fecha_entrega, 'YYYY-MM') = $2
@@ -158,7 +158,7 @@ router.get('/reporte-cliente-mes/:clienteId/:mes', async (req, res) => {
             buildOrderDetailBlock({
               title: `Pedido #${pedido.nro_pedido || pedido.pedido_id}`,
               metaLines: [
-                `Fecha ${formatDate(pedido.fecha_entrega)} | Estado ${pedido.estado || '-'}`,
+                `Fecha ${formatDate(pedido.fecha_entrega)} | Estado ${pedido.estado || '-'} | Tipo ${(pedido.tipo || 'particular').toUpperCase()}`,
                 pedido.direccion ? `Direccion: ${pedido.direccion}` : '',
                 pedido.info_extra ? `Referencia: ${pedido.info_extra}` : ''
               ],

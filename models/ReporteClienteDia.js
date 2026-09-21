@@ -1,34 +1,32 @@
 const express = require('express');
 const router = express.Router();
-const PdfPrinter = require('pdfmake');
 const pool = require('../config/db');
-const { buildReportFilename } = require('./reportPdfUtils');
+const {
+  createPrinter,
+  buildReportFilename,
+  formatCurrency,
+  formatDate,
+  buildSummaryTable,
+  buildDataTable,
+  buildDocDefinition,
+  sectionTitle
+} = require('./reportPdfUtils');
 
 router.get('/reporte-deudas-clientes', async (req, res) => {
-  const fonts = {
-    Roboto: {
-      normal: 'Helvetica',
-      bold: 'Helvetica-Bold',
-      italics: 'Helvetica-Oblique',
-      bolditalics: 'Helvetica-BoldOblique'
-    }
-  };
-  const printer = new PdfPrinter(fonts);
+  const printer = createPrinter();
 
   try {
-    // Traer todos los pedidos con deuda y sus clientes
     const pedidosRes = await pool.query(`
-  SELECT p.id AS pedido_id, p.usuario_id AS cliente_id, u.nombre AS cliente_nombre,
-         u.telefono, u.email, p.monto_total, p.monto_pagado, p.monto_pendiente, 
-         p.fecha_creacion, p.estado
-  FROM pedidos p
-  JOIN usuarios u ON u.id = p.usuario_id AND u.tipo_usuario = 'cliente'
-  WHERE p.monto_pendiente > 0
-    AND COALESCE(u.su, false) = false
-    AND p.estado = 'entregado'
-  ORDER BY u.id, p.fecha_creacion
-`);
-
+      SELECT p.id AS pedido_id, p.usuario_id AS cliente_id, u.nombre AS cliente_nombre,
+             u.telefono, u.email, p.monto_total, p.monto_pagado, p.monto_pendiente,
+             p.fecha_creacion, p.estado, p.tipo
+      FROM pedidos p
+      JOIN usuarios u ON u.id = p.usuario_id AND u.tipo_usuario = 'cliente'
+      WHERE p.monto_pendiente > 0
+        AND COALESCE(u.su, false) = false
+        AND p.estado = 'entregado'
+      ORDER BY u.id, p.fecha_creacion
+    `);
 
     const pedidos = pedidosRes.rows;
     if (!pedidos.length) {
@@ -37,10 +35,9 @@ router.get('/reporte-deudas-clientes', async (req, res) => {
 
     const pedidoIds = pedidos.map(p => p.pedido_id);
 
-    // Productos por pedido
     const productosRes = await pool.query(`
       SELECT pd.pedido_id, pr.nombre AS producto_nombre,
-             pd.cantidad, pd.preciounitario, 
+             pd.cantidad, pd.preciounitario,
              (pd.cantidad * pd.preciounitario) AS subtotal
       FROM pedidoproducto pd
       JOIN productos pr ON pr.idproducto = pd.producto_id
@@ -50,13 +47,14 @@ router.get('/reporte-deudas-clientes', async (req, res) => {
     const productosMap = {};
     productosRes.rows.forEach(pd => {
       if (!productosMap[pd.pedido_id]) productosMap[pd.pedido_id] = [];
-      productosMap[pd.pedido_id].push(pd);
+      productosMap[pd.pedido_id].push({
+        producto_nombre: pd.producto_nombre,
+        cantidad: Number(pd.cantidad || 0),
+        preciounitario: Number(pd.preciounitario || 0),
+        subtotal: Number(pd.subtotal || 0)
+      });
     });
 
-    let deudaTotalGeneral = 0;
-    const contentClientes = [];
-
-    // Agrupar pedidos por cliente
     const clientesMap = {};
     pedidos.forEach(p => {
       if (!clientesMap[p.cliente_id]) {
@@ -70,81 +68,86 @@ router.get('/reporte-deudas-clientes', async (req, res) => {
       clientesMap[p.cliente_id].pedidos.push(p);
     });
 
+    const clientesRows = [];
+    let deudaTotalGeneral = 0;
+    let totalFacturadoGeneral = 0;
+    let totalPagadoGeneral = 0;
+
     for (const clienteId in clientesMap) {
       const cliente = clientesMap[clienteId];
       let deudaCliente = 0;
-
-      contentClientes.push({ text: `Cliente: ${cliente.cliente_nombre}`, style: 'clienteHeader' });
-      contentClientes.push({ text: `Teléfono: ${cliente.telefono || ''} | Email: ${cliente.email}\n\n`, fontSize: 10 });
+      let facturadoCliente = 0;
+      let pagadoCliente = 0;
 
       cliente.pedidos.forEach(p => {
-        deudaCliente += parseFloat(p.monto_pendiente);
-        deudaTotalGeneral += parseFloat(p.monto_pendiente);
-
-        const productos = productosMap[p.pedido_id] || [];
-        const productosTable = {
-          table: {
-            widths: ['*', 60, 80, 80],
-            body: [
-              [
-                { text: 'Producto', style: 'tableHeader' },
-                { text: 'Cantidad', style: 'tableHeader' },
-                { text: 'Precio Unitario', style: 'tableHeader' },
-                { text: 'Subtotal', style: 'tableHeader' }
-              ],
-              ...productos.map(pr => [
-                pr.producto_nombre,
-                pr.cantidad.toString(),
-                `Bs${parseFloat(pr.preciounitario).toFixed(2)}`,
-                `Bs${parseFloat(pr.subtotal).toFixed(2)}`
-              ])
-            ]
-          },
-          layout: 'lightHorizontalLines',
-          margin: [0, 5, 0, 10]
-        };
-
-        contentClientes.push({
-          stack: [
-            { text: `Pedido ID: ${p.pedido_id} | Fecha: ${new Date(p.fecha_creacion).toLocaleDateString()}`, style: 'pedidoId' },
-            productosTable,
-            { text: `Total: Bs${parseFloat(p.monto_total).toFixed(2)} | Pagado: Bs${parseFloat(p.monto_pagado).toFixed(2)} | Pendiente: Bs${parseFloat(p.monto_pendiente).toFixed(2)}`, style: 'totalesPedido' },
-            { text: '\n' }
-          ]
-        });
+        const pendiente = parseFloat(p.monto_pendiente);
+        const total = parseFloat(p.monto_total);
+        const pagado = parseFloat(p.monto_pagado);
+        deudaCliente += pendiente;
+        facturadoCliente += total;
+        pagadoCliente += pagado;
+        deudaTotalGeneral += pendiente;
+        totalFacturadoGeneral += total;
+        totalPagadoGeneral += pagado;
       });
 
-      contentClientes.push({
-        text: `Deuda Total del Cliente: Bs${deudaCliente.toFixed(2)}\n\n`,
-        style: 'totalesCliente'
-      });
-      contentClientes.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 750, y2: 0, lineWidth: 1, lineColor: '#CCCCCC' }] });
+      clientesRows.push([
+        cliente.cliente_nombre,
+        cliente.telefono || '-',
+        String(cliente.pedidos.length),
+        formatCurrency(facturadoCliente),
+        formatCurrency(pagadoCliente),
+        formatCurrency(deudaCliente)
+      ]);
     }
 
-    const docDefinition = {
-      pageSize: 'A4',
-      pageOrientation: 'landscape',
-      pageMargins: [40, 40, 40, 40],
+    clientesRows.sort((a, b) => {
+      const deudaA = parseFloat(a[5].replace('Bs', ''));
+      const deudaB = parseFloat(b[5].replace('Bs', ''));
+      return deudaB - deudaA;
+    });
+
+    const detalleRows = pedidos.map(p => [
+      formatDate(p.fecha_creacion),
+      `#${p.pedido_id}`,
+      p.cliente_nombre,
+      p.estado,
+      (p.tipo || 'particular').toUpperCase(),
+      formatCurrency(parseFloat(p.monto_total)),
+      formatCurrency(parseFloat(p.monto_pagado)),
+      formatCurrency(parseFloat(p.monto_pendiente))
+    ]);
+
+    const docDefinition = buildDocDefinition({
+      title: 'Reporte de Deudas por Cliente',
+      subtitleLines: [`Fecha de corte: ${formatDate(new Date())}`],
       content: [
-        { text: 'Reporte de Deudas por Cliente', style: 'header', alignment: 'center' },
-        { text: `Fecha: ${new Date().toLocaleDateString()}\n\n`, alignment: 'center' },
-        ...contentClientes,
-        { text: `\nDEUDA TOTAL GENERAL: Bs${deudaTotalGeneral.toFixed(2)}`, style: 'totalesGeneral', alignment: 'right' }
-      ],
-      styles: {
-        header: { fontSize: 20, bold: true, color: '#2E86C1' },
-        clienteHeader: { fontSize: 14, bold: true, color: '#1F618D', margin: [0, 10, 0, 5] },
-        pedidoId: { fontSize: 10, color: '#555555', margin: [0, 0, 0, 5] },
-        totalesPedido: { fontSize: 10, margin: [0, 2, 0, 5] },
-        totalesCliente: { fontSize: 12, bold: true, color: 'red', margin: [0, 5, 0, 10] },
-        totalesGeneral: { fontSize: 16, bold: true, color: 'red' },
-        tableHeader: { bold: true, fillColor: '#D6EAF8' }
-      }
-    };
+        sectionTitle('Resumen general'),
+        buildSummaryTable([
+          { label: 'Clientes con deuda', value: String(Object.keys(clientesMap).length) },
+          { label: 'Pedidos pendientes', value: String(pedidos.length) },
+          { label: 'Deuda total', value: formatCurrency(deudaTotalGeneral), tone: 'danger' },
+          { label: 'Total facturado', value: formatCurrency(totalFacturadoGeneral), tone: 'warning' },
+          { label: 'Total pagado', value: formatCurrency(totalPagadoGeneral), tone: 'success' }
+        ], 3),
+        sectionTitle('Deuda por cliente'),
+        buildDataTable(
+          ['Cliente', 'Telefono', 'Pedidos', 'Facturado', 'Pagado', 'Pendiente'],
+          clientesRows.length ? clientesRows : [['Sin datos', '-', '-', '-', '-', '-']],
+          ['*', 80, 55, 90, 90, 90]
+        ),
+        sectionTitle('Detalle de pedidos pendientes'),
+        buildDataTable(
+          ['Fecha', 'Pedido', 'Cliente', 'Estado', 'Tipo', 'Total', 'Pagado', 'Pendiente'],
+          detalleRows,
+          [65, 50, '*', 65, 55, 80, 80, 80]
+        )
+      ]
+    });
 
     const pdfDoc = printer.createPdfKitDocument(docDefinition);
-    let chunks = [];
-    pdfDoc.on('data', chunk => chunks.push(chunk));
+    const chunks = [];
+    pdfDoc.on('data', (chunk) => chunks.push(chunk));
     pdfDoc.on('end', () => {
       const result = Buffer.concat(chunks);
       res.setHeader('Content-Type', 'application/pdf');
@@ -152,15 +155,14 @@ router.get('/reporte-deudas-clientes', async (req, res) => {
         'Content-Disposition',
         `attachment; filename=${buildReportFilename({
           entityType: 'clientes',
-          subjectName: 'clientes',
-          reportType: 'deuda',
+          subjectName: 'deudas',
+          reportType: 'general',
           reportDate: new Date()
         })}`
       );
       res.send(result);
     });
     pdfDoc.end();
-
   } catch (err) {
     console.error(err);
     res.status(500).send('Error generando reporte de deudas por cliente');

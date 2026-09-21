@@ -32,7 +32,7 @@ router.get('/reporte-deudas-cliente/:clienteId', async (req, res) => {
 
     const pedidosRes = await pool.query(
       `SELECT p.id AS pedido_id, p.monto_total, p.monto_pagado,
-              p.monto_pendiente, p.fecha_creacion::date AS fecha_creacion, p.estado
+              p.monto_pendiente, p.fecha_creacion::date AS fecha_creacion, p.estado, p.tipo
        FROM pedidos p
        WHERE p.usuario_id = $1
          AND p.monto_pendiente > 0
@@ -97,6 +97,7 @@ router.get('/reporte-deudas-cliente/:clienteId', async (req, res) => {
       formatDate(pedido.fecha_creacion),
       `#${pedido.pedido_id}`,
       pedido.estado,
+      (pedido.tipo || 'particular').toUpperCase(),
       `${pedido.antiguedadDias} dias`,
       formatCurrency(pedido.total),
       formatCurrency(pedido.pagado),
@@ -135,9 +136,9 @@ router.get('/reporte-deudas-cliente/:clienteId', async (req, res) => {
       ),
       sectionTitle('Detalle de pedidos pendientes'),
       buildDataTable(
-        ['Fecha', 'Pedido', 'Estado', 'Antiguedad', 'Total', 'Pagado', 'Pendiente'],
+        ['Fecha', 'Pedido', 'Estado', 'Tipo', 'Antiguedad', 'Total', 'Pagado', 'Pendiente'],
         detalleRows,
-        [70, 55, 65, 75, 85, 85, 85]
+        [65, 50, 60, 55, 70, 80, 80, 80]
       )
     ];
 

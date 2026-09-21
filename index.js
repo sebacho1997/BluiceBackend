@@ -32,6 +32,9 @@ const initAuthTables = require('./config/initAuthTables');
 const reporteGeneral = require('./models/reporteGeneral');
 const reporteComisiones = require('./models/reporteComisiones');
 const reporteListaClientes = require('./models/reporteListaClientes');
+const reporteEquipos = require('./models/reporteEquipos');
+const reporteInventarioConductor = require('./models/reporteInventarioConductor');
+const reporteDevolucionesEquipo = require('./models/reporteDevolucionesEquipo');
 const configRoutes = require('./routes/configRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const reconciliacionRoutes = require('./routes/reconciliacionRoutes');
@@ -115,6 +118,9 @@ app.use('/api', reporteClientePersonalizado);
 app.use('/api', reporteGeneral);
 app.use('/api', reporteComisiones);
 app.use('/api', reporteListaClientes);
+app.use('/api', reporteEquipos);
+app.use('/api', reporteInventarioConductor);
+app.use('/api', reporteDevolucionesEquipo);
 
 const PORT = process.env.PORT || 5000;
 

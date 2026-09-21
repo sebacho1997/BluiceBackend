@@ -58,6 +58,29 @@ const User = {
     }
   },
 
+  // Busca un cliente por los últimos 8 dígitos del teléfono.
+  // Sirve para fusionar el registro en la app con un cliente creado
+  // por el bot de WhatsApp (mismo número, sin cuenta aún).
+  async findClienteByPhoneTail(tail8) {
+    try {
+      const clean = (tail8 || '').toString().replace(/\D/g, '').slice(-8);
+      if (clean.length < 8) return undefined;
+      const result = await pool.query(
+        `SELECT *
+         FROM usuarios
+         WHERE tipo_usuario = 'cliente'
+           AND activado = true
+           AND COALESCE(su, false) = false`
+      );
+      return result.rows.find(
+        (r) => (r.telefono || '').toString().replace(/\D/g, '').slice(-8) === clean
+      );
+    } catch (error) {
+      console.error('Error al buscar cliente por teléfono:', error);
+      throw new Error('No se pudo buscar el cliente');
+    }
+  },
+
   async getById(id) {
     try {
       const result = await pool.query(

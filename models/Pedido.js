@@ -3,7 +3,13 @@ const pool = require('../config/db');
 
 const Pedido = {
 async create(pedidoData) {
-  const { usuario_id, direccion_id, direccion, latitud, longitud, info_extra, estado, productos, id_conductor } = pedidoData;
+  const { usuario_id, direccion_id, direccion, latitud, longitud, info_extra, estado, productos, id_conductor, tipo } = pedidoData;
+  const esContrato = (tipo || 'particular').toString().toLowerCase() === 'contrato';
+  const esBoliche = (tipo || 'particular').toString().toLowerCase() === 'boliche';
+  // En contrato y boliche no se reserva stock al crear: las entregas se
+  // definen cuando el conductor entrega (boliche puede llevar cantidad fija
+  // y/o productos libres, por eso se permite cantidad 0 y mayor a 0).
+  const sinReservaStock = esContrato || esBoliche;
   const client = await pool.connect();
 
   try {
@@ -16,10 +22,10 @@ async create(pedidoData) {
     // Insertar pedido con estado pendiente
     const pedidoRes = await client.query(
       `INSERT INTO pedidos 
-       (usuario_id, direccion_id, direccion, latitud, longitud, info_extra, estado, monto_total, monto_pagado, monto_pendiente,id_conductor)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,0,0,0,$8)
+       (usuario_id, direccion_id, direccion, latitud, longitud, info_extra, estado, monto_total, monto_pagado, monto_pendiente,id_conductor,tipo)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,0,0,0,$8,$9)
        RETURNING *`,
-      [usuario_id, direccion_id || null, direccion || null, latitud || null, longitud || null, info_extra || null, estado, id_conductor]
+      [usuario_id, direccion_id || null, direccion || null, latitud || null, longitud || null, info_extra || null, estado, id_conductor, tipo || 'particular']
     );
 
     const pedido = pedidoRes.rows[0];
@@ -27,8 +33,15 @@ async create(pedidoData) {
     
     // Insertar productos, validar stock y calcular monto total
     for (const prod of productos) {
-      const cantidadSolicitada = Number(prod.cantidad);
-      if (!Number.isInteger(cantidadSolicitada) || cantidadSolicitada <= 0) {
+      // En un contrato todavia no se sabe la cantidad a entregar: se
+      // registra el producto con cantidad 0 y el conductor define cuanto
+      // entrega. En boliche puede ser 0 (libre) o la cantidad fija pedida.
+      const cantidadSolicitada = esContrato ? 0 : Number(prod.cantidad);
+      const cantidadInvalida =
+        !Number.isInteger(cantidadSolicitada) ||
+        cantidadSolicitada < 0 ||
+        (!sinReservaStock && cantidadSolicitada === 0);
+      if (cantidadInvalida) {
         throw new Error(`Cantidad invalida para el producto ${prod.producto_id}`);
       }
 
@@ -41,7 +54,7 @@ async create(pedidoData) {
       }
 
       const productoDb = prodRes.rows[0];
-      if (Number(productoDb.cantidad) < cantidadSolicitada) {
+      if (!sinReservaStock && Number(productoDb.cantidad) < cantidadSolicitada) {
         const stockError = new Error(`Stock insuficiente para el producto ${prod.producto_id}`);
         stockError.code = 'STOCK_INSUFICIENTE';
         stockError.producto_id = prod.producto_id;
@@ -51,7 +64,9 @@ async create(pedidoData) {
       }
 
       const precioUnitario = Number(productoDb.preciounitario);
-      montoTotal += precioUnitario * cantidadSolicitada;
+      if (!sinReservaStock) {
+        montoTotal += precioUnitario * cantidadSolicitada;
+      }
 
       await client.query(
         `INSERT INTO pedidoproducto (pedido_id, producto_id, cantidad, preciounitario)
@@ -59,12 +74,14 @@ async create(pedidoData) {
         [pedido.id, prod.producto_id, cantidadSolicitada, precioUnitario]
       );
 
-      await client.query(
-        `UPDATE productos
-         SET cantidad = cantidad - $1
-         WHERE idproducto = $2`,
-        [cantidadSolicitada, prod.producto_id]
-      );
+      if (!sinReservaStock) {
+        await client.query(
+          `UPDATE productos
+           SET cantidad = cantidad - $1
+           WHERE idproducto = $2`,
+          [cantidadSolicitada, prod.producto_id]
+        );
+      }
     }
 
     // Actualizar montos en el pedido
@@ -656,9 +673,11 @@ async cancelarYEliminar(pedido_id) {
 async getAssignedOrdersByDriver(conductor_id) {
   try {
     const result = await pool.query(
-      `SELECT p.*, u.nombre AS cliente_nombre
+      `SELECT p.*, u.nombre AS cliente_nombre,
+              d.nombre AS direccion_nombre
        FROM pedidos p
        JOIN usuarios u ON u.id = p.usuario_id
+       LEFT JOIN direcciones d ON d.id = p.direccion_id
        WHERE p.id_conductor = $1
          AND COALESCE(u.su, false) = false
          AND p.estado IN ('asignado', 'parcial', 'pagado')
@@ -679,9 +698,11 @@ async getAssignedOrdersByDriver(conductor_id) {
 async getNonCompletedOrdersByDriver(conductor_id) {
   try {
     const result = await pool.query(
-      `SELECT p.*, u.nombre AS cliente_nombre
+      `SELECT p.*, u.nombre AS cliente_nombre,
+              d.nombre AS direccion_nombre
        FROM pedidos p
        JOIN usuarios u ON u.id = p.usuario_id
+       LEFT JOIN direcciones d ON d.id = p.direccion_id
        WHERE p.id_conductor = $1
          AND COALESCE(u.su, false) = false
          AND p.estado NOT IN ('completado', 'cancelado')
@@ -705,7 +726,7 @@ async registrarEntregaParcial(pedido_id, entregas) {
     await client.query('BEGIN');
 
     const pedidoRes = await client.query(
-      `SELECT estado FROM pedidos WHERE id = $1 FOR UPDATE`,
+      `SELECT estado, tipo FROM pedidos WHERE id = $1 FOR UPDATE`,
       [pedido_id]
     );
     if (pedidoRes.rows.length === 0) {
@@ -714,6 +735,15 @@ async registrarEntregaParcial(pedido_id, entregas) {
     if (pedidoRes.rows[0].estado === 'entregado') {
       throw new Error('El pedido ya fue entregado totalmente');
     }
+    const esContrato =
+      (pedidoRes.rows[0].tipo || 'particular').toString().toLowerCase() ===
+      'contrato';
+    const esBoliche =
+      (pedidoRes.rows[0].tipo || 'particular').toString().toLowerCase() ===
+      'boliche';
+    // En contrato/boliche el stock no se reservo al crear: se descuenta
+    // recien aca, con lo que el conductor entrega.
+    const descontarStock = esContrato || esBoliche;
 
     for (const e of entregas) {
       const cantidadEnt = Number(e.cantidad) ?? 0;
@@ -734,13 +764,53 @@ async registrarEntregaParcial(pedido_id, entregas) {
 
       const total = Number(row.rows[0].cantidad);
       const entregadaActual = Number(row.rows[0].cantidad_entregada);
-      const nuevaEntregada = Math.min(total, entregadaActual + cantidadEnt);
+
+      // En contrato no hay cantidad objetivo: la cantidad del pedido se
+      // define con lo que el conductor entrega. En boliche un producto con
+      // cantidad fija se limita a lo pedido; un producto libre (cantidad 0)
+      // se comporta como contrato. En los demas tipos se acumula sin superar
+      // la cantidad pedida.
+      const sinObjetivo = esContrato || (esBoliche && total === 0);
+      let nuevaEntregada;
+      let nuevaCantidad = total;
+      if (sinObjetivo) {
+        nuevaEntregada = entregadaActual + cantidadEnt;
+        nuevaCantidad = nuevaEntregada;
+      } else {
+        nuevaEntregada = Math.min(total, entregadaActual + cantidadEnt);
+      }
 
       await client.query(
         `UPDATE pedidoproducto
-            SET cantidad_entregada = $1
-          WHERE pedido_id = $2 AND producto_id = $3`,
-        [nuevaEntregada, pedido_id, e.producto_id]
+            SET cantidad_entregada = $1, cantidad = $2
+          WHERE pedido_id = $3 AND producto_id = $4`,
+        [nuevaEntregada, nuevaCantidad, pedido_id, e.producto_id]
+      );
+
+      if (descontarStock) {
+        await client.query(
+          `UPDATE productos
+              SET cantidad = GREATEST(cantidad - $1, 0)
+            WHERE idproducto = $2`,
+          [cantidadEnt, e.producto_id]
+        );
+      }
+    }
+
+    if (esContrato) {
+      const montoRes = await client.query(
+        `SELECT COALESCE(SUM(cantidad * preciounitario), 0) AS total
+           FROM pedidoproducto
+          WHERE pedido_id = $1`,
+        [pedido_id]
+      );
+      const nuevoTotal = Number(montoRes.rows[0].total || 0);
+      await client.query(
+        `UPDATE pedidos
+            SET monto_total = $1,
+                monto_pendiente = $1 - COALESCE(monto_pagado, 0)
+          WHERE id = $2`,
+        [nuevoTotal, pedido_id]
       );
     }
 

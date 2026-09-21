@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { resolveShortUrl } = require('../services/urlResolver');
 
 // GET /api/resolver-url?url=https://maps.app.goo.gl/...
 // Resuelve links cortos del lado del servidor y devuelve la URL final.
@@ -7,31 +8,11 @@ const router = express.Router();
 // cross-origin por CORS, así que la app no puede resolverlos sola.
 router.get('/resolver-url', async (req, res) => {
   const target = (req.query.url || '').toString().trim();
-
-  let parsed;
-  try {
-    parsed = new URL(target);
-  } catch (_) {
-    return res.status(400).json({ error: 'URL inválida' });
-  }
-  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-    return res.status(400).json({ error: 'Solo se permiten URLs http(s)' });
-  }
-
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 10000);
-    const response = await fetch(target, {
-      redirect: 'follow',
-      signal: controller.signal,
-    });
-    clearTimeout(timer);
-    await response.arrayBuffer();
-    return res.json({ url: response.url });
-  } catch (err) {
-    console.error('Error resolviendo URL:', err.message);
+  const url = await resolveShortUrl(target);
+  if (!url) {
     return res.status(502).json({ error: 'No se pudo resolver la URL' });
   }
+  return res.json({ url });
 });
 
 module.exports = router;

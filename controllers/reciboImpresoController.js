@@ -1,5 +1,31 @@
 const pool = require('../config/db');
 
+// Para contrato y boliche NO se guardan precios ni totales: solo se guarda el
+// detalle (nombre y cantidad). Solo el recibo "particular" conserva los montos.
+function sanitizarDatos(datos, tipo) {
+  if (!datos) return null;
+
+  const copia = JSON.parse(JSON.stringify(datos));
+  const sinMontos = tipo === 'contrato' || tipo === 'boliche';
+
+  if (sinMontos) {
+    if (Array.isArray(copia.productos)) {
+      copia.productos = copia.productos.map((p) => {
+        if (!p || typeof p !== 'object') return {};
+        return {
+          nombre: p.nombre,
+          cantidad: p.cantidad,
+        };
+      });
+    }
+    delete copia.monto_total;
+    delete copia.monto_pagado;
+    delete copia.monto_pendiente;
+  }
+
+  return copia;
+}
+
 const ReciboImpresoController = {
   async guardar(req, res) {
     try {
@@ -8,10 +34,13 @@ const ReciboImpresoController = {
         return res.status(400).json({ error: 'pedido_id es requerido' });
       }
 
+      const tipoRecibo = (tipo || 'particular').toString().toLowerCase();
+      const datos = sanitizarDatos(datos_recibo, tipoRecibo);
+
       const result = await pool.query(
         `INSERT INTO recibos_impresos (pedido_id, numero_recibo, tipo, datos_recibo)
          VALUES ($1, $2, $3, $4::jsonb) RETURNING *`,
-        [pedido_id, numero_recibo || null, tipo || 'credito', datos_recibo ? JSON.stringify(datos_recibo) : null]
+        [pedido_id, numero_recibo || null, tipoRecibo, datos ? JSON.stringify(datos) : null]
       );
 
       res.status(201).json(result.rows[0]);

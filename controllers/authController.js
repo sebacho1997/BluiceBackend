@@ -84,6 +84,35 @@ const authController = {
 
       const hashedPassword = await bcrypt.hash(password, 10);
 
+      // Si el teléfono ya pertenece a un cliente (ej. creado por el bot
+      // de WhatsApp), se fusiona: se actualiza esa misma fila en vez de
+      // crear un duplicado. Así conserva ID, direcciones e historial.
+      const phoneOwner = await User.findClienteByPhoneTail(telefono);
+      if (phoneOwner) {
+        const merged = await User.update(phoneOwner.id, {
+          nombre: nombre || phoneOwner.nombre,
+          telefono: phoneOwner.telefono,
+          email,
+          password: hashedPassword,
+          activado: true,
+          tipo_usuario: 'cliente',
+          email_confirm: false
+        });
+
+        return res.status(201).json({
+          message: 'Cliente registrado con exito.',
+          fusionado: true,
+          user: {
+            id: merged.id,
+            nombre: merged.nombre,
+            telefono: merged.telefono,
+            email: merged.email,
+            tipo_usuario: merged.tipo_usuario,
+            email_confirm: false
+          }
+        });
+      }
+
       const newUser = await User.create({
         nombre,
         telefono,

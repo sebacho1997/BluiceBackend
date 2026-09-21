@@ -11,6 +11,9 @@ const productoRoutes = require('./routes/productoRoutes');
 const inventarioConductorRoutes = require('./routes/inventarioConductorRoutes');
 const pedidoImagenesRoutes = require('./routes/pedidoImagenesRoutes');
 const prestamoEquipoRoutes = require('./routes/prestamoEquipoRoutes');
+const equipoRoutes = require('./routes/equipoRoutes');
+const movimientoEquipoRoutes = require('./routes/movimientoEquipoRoutes');
+const devolucionEquipoRoutes = require('./routes/devolucionEquipoRoutes');
 const gastosDiaRoutes = require('./routes/gastosDiaRoutes');
 const contratoRoutes = require('./routes/contratoRoutes');
 const reporteMes = require('./models/reporteMes');
@@ -35,6 +38,7 @@ const reconciliacionRoutes = require('./routes/reconciliacionRoutes');
 const excelRoutes = require('./routes/excelRoutes');
 const reciboImpresoRoutes = require('./routes/reciboImpresoRoutes');
 const resolverUrlRoutes = require('./routes/resolverUrl');
+const whatsappRoutes = require('./routes/whatsapp');
 
 const app = express();
 
@@ -84,6 +88,9 @@ app.use('/api/inventario', inventarioConductorRoutes);
 app.use('/api/inventario-resta', inventarioConductorRestaRoutes);
 app.use('/api/pedidoImagenes', pedidoImagenesRoutes);
 app.use('/api/prestamos', prestamoEquipoRoutes);
+app.use('/api/equipos', equipoRoutes);
+app.use('/api/movimientos-equipos', movimientoEquipoRoutes);
+app.use('/api/devoluciones-equipos', devolucionEquipoRoutes);
 app.use('/api/gastos', gastosDiaRoutes);
 app.use('/api/contratos', contratoRoutes);
 app.use('/api/config', configRoutes);
@@ -92,6 +99,7 @@ app.use('/api/reconciliacion', reconciliacionRoutes);
 app.use('/api/excel', excelRoutes);
 app.use('/api/recibos', reciboImpresoRoutes);
 app.use('/api', resolverUrlRoutes);
+app.use('/api/whatsapp', whatsappRoutes);
 
 app.use('/api', reporteRouter);
 app.use('/api', reporteMes);

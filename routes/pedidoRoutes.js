@@ -39,6 +39,9 @@ router.get('/conductor/:conductor_id/nocompletados', authMiddleware, pedidoContr
 // Obtener pedidos asignados a un conductor
 router.get('/conductor/:conductor_id', authMiddleware, pedidoController.obtenerPedidosAsignados);
 
+// Obtener pedidos entregados hoy por un conductor (reporte diario)
+router.get('/conductor/:conductor_id/entregados', authMiddleware, pedidoController.obtenerPedidosEntregadosConductor);
+
 // Asignar conductor
 router.put('/:pedidoId/assign/:conductorId', authMiddleware, pedidoController.asignarConductor);
 

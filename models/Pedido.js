@@ -716,6 +716,29 @@ async getNonCompletedOrdersByDriver(conductor_id) {
   }
 },
 
+// Pedidos que el conductor ya entrego HOY (para el reporte diario).
+async getDeliveredOrdersByDriver(conductor_id) {
+  try {
+    const result = await pool.query(
+      `SELECT p.*, u.nombre AS cliente_nombre,
+              d.nombre AS direccion_nombre
+       FROM pedidos p
+       JOIN usuarios u ON u.id = p.usuario_id
+       LEFT JOIN direcciones d ON d.id = p.direccion_id
+       WHERE p.id_conductor = $1
+         AND COALESCE(u.su, false) = false
+         AND p.estado IN ('entregado', 'completado')
+         AND p.fecha_entrega::date = CURRENT_DATE
+       ORDER BY p.fecha_entrega, p.id DESC`,
+      [conductor_id]
+    );
+    return result.rows;
+  } catch (error) {
+    console.error('Error al obtener pedidos entregados del conductor:', error);
+    throw new Error('No se pudieron obtener los pedidos entregados del conductor');
+  }
+},
+
 // Registrar entrega parcial acumulando cantidades entregadas
 async registrarEntregaParcial(pedido_id, entregas) {
   if (!Array.isArray(entregas) || entregas.length === 0) {

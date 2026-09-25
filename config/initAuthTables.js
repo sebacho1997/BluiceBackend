@@ -81,6 +81,22 @@ async function initAuthTables() {
     CREATE INDEX IF NOT EXISTS idx_recibos_impresos_pedido_id
     ON recibos_impresos(pedido_id)
   `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS recibos_movimiento (
+      id BIGSERIAL PRIMARY KEY,
+      id_movimiento INTEGER NOT NULL REFERENCES movimiento_equipos(id) ON DELETE CASCADE,
+      numero_recibo VARCHAR(50),
+      tipo VARCHAR(20) NOT NULL DEFAULT 'garantia',
+      datos_recibo JSONB,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_recibos_movimiento_id_movimiento
+    ON recibos_movimiento(id_movimiento)
+  `);
 }
 
 module.exports = initAuthTables;

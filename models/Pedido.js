@@ -565,18 +565,52 @@ async getProductosByPedido(pedidoId) {
   }
 },
 async agregarRecibo(pedido_id, numeroRecibo) {
+  const { obtenerSiguienteNumero, crearRecibo, mesActual } = require('./reciboImpreso');
+  const client = await pool.connect();
+  const mes = mesActual();
   try {
-    const result = await pool.query(
+    await client.query('BEGIN');
+
+    const pedidoRes = await client.query(
+      `SELECT tipo FROM pedidos WHERE id = $1 FOR UPDATE`,
+      [pedido_id]
+    );
+    if (pedidoRes.rows.length === 0) {
+      throw new Error('Pedido no encontrado');
+    }
+    const tipo = (pedidoRes.rows[0].tipo || 'particular').toString().toLowerCase();
+
+    let numero = numeroRecibo ? String(numeroRecibo).trim() : '';
+    if (!numero) {
+      numero = String(await obtenerSiguienteNumero(client, 'recibos_impresos', tipo, mes));
+    }
+
+    await crearRecibo({
+      client,
+      tabla: 'recibos_impresos',
+      pedido_id,
+      numero_recibo: numero,
+      tipo,
+    });
+
+    const result = await client.query(
       `UPDATE pedidos
        SET nro_recibo = $1
        WHERE id = $2
        RETURNING *`,
-      [numeroRecibo, pedido_id]
+      [numero, pedido_id]
     );
-    return result.rows[0];
+
+    await client.query('COMMIT');
+    const pedido = result.rows[0] || null;
+    if (pedido) pedido.numero_recibo = numero;
+    return pedido;
   } catch (error) {
+    await client.query('ROLLBACK');
     console.error('Error al agregar recibo del pedido:', error);
     throw new Error('No se pudo agregar el recibo del pedido');
+  } finally {
+    client.release();
   }
 },
 async confirmarEntrega(pedido_id) {

@@ -119,6 +119,7 @@ const MovimientoEquipo = {
 
   // Entrega un préstamo pendiente: descuenta stock y marca fecha de entrega.
   async entregar(id, nroRecibo) {
+    const { obtenerSiguienteNumero, crearRecibo, mesActual } = require('./reciboImpreso');
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
@@ -133,6 +134,18 @@ const MovimientoEquipo = {
         throw new Error('El prestamo ya fue entregado o devuelto');
       }
 
+      let numero = nroRecibo ? String(nroRecibo).trim() : '';
+      if (mov.con_garantia && !numero) {
+        numero = String(await obtenerSiguienteNumero(client, 'recibos_movimiento', 'garantia', mesActual()));
+        await crearRecibo({
+          client,
+          tabla: 'recibos_movimiento',
+          id_movimiento: id,
+          numero_recibo: numero,
+          tipo: 'garantia',
+        });
+      }
+
       await restarStock(client, mov.id_equipo, Number(mov.cantidad));
 
       const upd = await client.query(
@@ -140,11 +153,13 @@ const MovimientoEquipo = {
          SET estado = 'prestado', fecha_entrega = $1,
              nro_recibo = COALESCE(NULLIF($2, ''), nro_recibo)
          WHERE id = $3 RETURNING *`,
-        [new Date(), nroRecibo || '', id]
+        [new Date(), numero, id]
       );
 
       await client.query('COMMIT');
-      return upd.rows[0];
+      const movUpd = upd.rows[0];
+      if (movUpd && numero) movUpd.numero_recibo = numero;
+      return movUpd;
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;

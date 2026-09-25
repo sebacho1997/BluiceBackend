@@ -194,9 +194,6 @@ async agregarRecibo(req, res) {
     const { numeroRecibo } = req.body;
     console.log(req.params);
     console.log(id);
-    if (!numeroRecibo) {
-      return res.status(400).json({ error: 'Debe proporcionar un número de recibo' });
-    }
 
     const pedidoActualizado = await Pedido.agregarRecibo(parseInt(id), numeroRecibo);
 

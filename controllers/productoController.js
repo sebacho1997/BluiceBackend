@@ -5,7 +5,7 @@ const productoController = {
   // Crear producto
   async crearProducto(req, res) {
     try {
-      const { nombre, cantidad, preciounitario } = req.body;
+      const { nombre, nombre_interno, cantidad, preciounitario } = req.body;
 
       if (!nombre || cantidad === undefined || preciounitario === undefined) {
         return res.status(400).json({ mensaje: 'Completa todos los campos' });
@@ -27,6 +27,7 @@ const productoController = {
 
       const producto = await Producto.create({
         nombre,
+        nombre_interno: nombre_interno?.toString().trim() || null,
         cantidad: cantidadNum,
         preciounitario: precioNum,
         imagen: imageUrl,
@@ -44,7 +45,7 @@ const productoController = {
   async actualizarProducto(req, res) {
     try {
       const { id } = req.params;
-      const { nombre, cantidad, preciounitario } = req.body;
+      const { nombre, nombre_interno, cantidad, preciounitario } = req.body;
 
       // Buscamos el producto actual
       const productoActual = await Producto.getById(id);
@@ -52,6 +53,9 @@ const productoController = {
 
       // Mantener valores actuales si no se envian
       const nombreFinal = nombre ?? productoActual.nombre;
+      const nombreInternoFinal = nombre_interno === undefined
+        ? productoActual.nombre_interno
+        : (nombre_interno?.toString().trim() || null);
       const cantidadFinal = cantidad ?? productoActual.cantidad;
       const preciounitarioFinal = preciounitario ?? productoActual.preciounitario;
 
@@ -80,6 +84,7 @@ const productoController = {
 
       const producto = await Producto.update(id, {
         nombre: nombreFinal,
+        nombre_interno: nombreInternoFinal,
         cantidad: cantidadNum,
         preciounitario: precioNum,
         imagen: imageUrl,

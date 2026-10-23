@@ -1,11 +1,11 @@
 const pool = require('../config/db');
 
 const Producto = {
-  async create({ nombre, cantidad, preciounitario, imagen, imagen_id }) {
+  async create({ nombre, nombre_interno, cantidad, preciounitario, imagen, imagen_id }) {
   const result = await pool.query(
-    `INSERT INTO productos (nombre, cantidad, preciounitario, imagen, imagen_id)
-     VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-    [nombre, cantidad, preciounitario, imagen, imagen_id]
+    `INSERT INTO productos (nombre, nombre_interno, cantidad, preciounitario, imagen, imagen_id)
+     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+    [nombre, nombre_interno, cantidad, preciounitario, imagen, imagen_id]
   );
   return result.rows[0];
 },
@@ -19,12 +19,12 @@ const Producto = {
     return result.rows[0];
   },
 
-  async update(idproducto, { nombre, cantidad, preciounitario, imagen, imagen_id }) {
+  async update(idproducto, { nombre, nombre_interno, cantidad, preciounitario, imagen, imagen_id }) {
   const result = await pool.query(
     `UPDATE productos
-     SET nombre = $1, cantidad = $2, preciounitario = $3, imagen = $4, imagen_id = $5
-     WHERE idproducto = $6 RETURNING *`,
-    [nombre, cantidad, preciounitario, imagen, imagen_id, idproducto]
+     SET nombre = $1, nombre_interno = $2, cantidad = $3, preciounitario = $4, imagen = $5, imagen_id = $6
+     WHERE idproducto = $7 RETURNING *`,
+    [nombre, nombre_interno, cantidad, preciounitario, imagen, imagen_id, idproducto]
   );
   return result.rows[0];
 },

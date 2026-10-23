@@ -3,7 +3,7 @@ const pool = require('../config/db');
 
 const Pedido = {
 async create(pedidoData) {
-  const { usuario_id, direccion_id, direccion, latitud, longitud, info_extra, estado, productos, id_conductor, tipo } = pedidoData;
+  const { usuario_id, direccion_id, direccion, latitud, longitud, info_extra, estado, productos, id_conductor, tipo, notificar_admin } = pedidoData;
   const esContrato = (tipo || 'particular').toString().toLowerCase() === 'contrato';
   const esBoliche = (tipo || 'particular').toString().toLowerCase() === 'boliche';
   // En contrato y boliche no se reserva stock al crear: las entregas se
@@ -93,6 +93,35 @@ async create(pedidoData) {
     );
 
     await client.query('COMMIT');
+
+    // La notificacion se guarda fuera de la transaccion: si falla, el pedido
+    // ya quedo registrado y el administrador lo vera igual en pendientes.
+    if (notificar_admin !== false) {
+      try {
+        const clienteRes = await pool.query(
+          'SELECT nombre FROM usuarios WHERE id = $1',
+          [usuario_id]
+        );
+        const clienteNombre = clienteRes.rows[0]?.nombre || 'Un cliente';
+        const tipoPedido = (tipo || 'particular').toString().toLowerCase();
+        const montoTexto = montoTotal > 0
+          ? ` por Bs ${montoTotal.toFixed(2)}`
+          : '';
+
+        await pool.query(
+          `INSERT INTO notificaciones_admin (pedido_id, titulo, mensaje)
+           VALUES ($1, $2, $3)`,
+          [
+            pedido.id,
+            'Nuevo pedido',
+            `${clienteNombre} realizo el pedido #${pedido.id} (${tipoPedido})${montoTexto}`,
+          ]
+        );
+      } catch (notificacionError) {
+        console.error('No se pudo crear la notificacion del pedido:', notificacionError);
+      }
+    }
+
     return pedido;
   } catch (error) {
     await client.query('ROLLBACK');

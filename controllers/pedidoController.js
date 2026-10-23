@@ -1,6 +1,7 @@
 // controllers/pedidoController.js
 const Pedido = require('../models/Pedido');
 const pool = require('../config/db');
+const { isAdmin } = require('../middleware/authMiddleware');
 
 const pedidoController = {
   // Crear pedido
@@ -19,7 +20,10 @@ const pedidoController = {
         }
       }
 
-      const pedido = await Pedido.create(req.body);
+      const pedido = await Pedido.create({
+        ...req.body,
+        notificar_admin: !isAdmin(req.user),
+      });
       res.status(201).json(pedido);
     } catch (error) {
       console.error('Error al crear pedido:', error);

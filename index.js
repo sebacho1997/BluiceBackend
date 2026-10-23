@@ -48,6 +48,7 @@ const excelRoutes = require('./routes/excelRoutes');
 const reciboImpresoRoutes = require('./routes/reciboImpresoRoutes');
 const resolverUrlRoutes = require('./routes/resolverUrl');
 const whatsappRoutes = require('./routes/whatsapp');
+const notificacionRoutes = require('./routes/notificacionRoutes');
 
 const app = express();
 
@@ -126,6 +127,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/reconciliacion', reconciliacionRoutes);
 app.use('/api/excel', excelRoutes);
 app.use('/api/recibos', reciboImpresoRoutes);
+app.use('/api/notificaciones', notificacionRoutes);
 app.use('/api', resolverUrlRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
 

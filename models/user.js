@@ -15,7 +15,7 @@ const User = {
     const { nombre, telefono, email, password, activado, tipo_usuario, email_confirm } = userData;
     try {
       const result = await pool.query(
-        'INSERT INTO usuarios (nombre,telefono,email,password,activado,tipo_usuario,email_confirm) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *',
+        'INSERT INTO usuarios (nombre,telefono,email,password,activado,tipo_usuario,email_confirm) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id, nombre, telefono, email, activado, tipo_usuario, email_confirm',
         [nombre, telefono, email, password, activado, tipo_usuario, email_confirm ?? true]
       );
       return result.rows[0];

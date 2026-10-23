@@ -727,8 +727,9 @@ async getAssignedOrdersByDriver(conductor_id) {
   }
 },
 
-// Todos los pedidos del conductor que aun NO estan completados ni cancelados
-// (sin filtro de fecha: incluye pendientes de dias anteriores).
+// Todos los pedidos del conductor menos los completados (cualquier fecha).
+// Se excluye solo 'completado': el resto de estados debe verse en la
+// pestana "Todos los pedidos" de la vista del conductor.
 async getNonCompletedOrdersByDriver(conductor_id) {
   try {
     const result = await pool.query(
@@ -739,7 +740,7 @@ async getNonCompletedOrdersByDriver(conductor_id) {
        LEFT JOIN direcciones d ON d.id = p.direccion_id
        WHERE p.id_conductor = $1
          AND COALESCE(u.su, false) = false
-         AND p.estado NOT IN ('completado', 'cancelado')
+         AND p.estado <> 'completado'
        ORDER BY p.fecha_creacion DESC, p.id DESC`,
       [conductor_id]
     );

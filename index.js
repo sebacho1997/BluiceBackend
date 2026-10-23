@@ -1,3 +1,9 @@
+// Debe ser lo primero, antes de cualquier require: la zona horaria del proceso
+// decide como `pg` interpreta las columnas `timestamp without time zone`.
+// Sin esto, el servidor (UTC en Render) lee una hora de Bolivia como si fuera
+// UTC y la API entrega el instante 4 h corrido.
+process.env.TZ = process.env.APP_TIMEZONE || 'America/La_Paz';
+
 require('express-async-errors');
 const express = require('express');
 const cors = require('cors');
@@ -58,14 +64,33 @@ const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173')
   .map(s => s.trim())
   .concat(baseUrlOrigin ? [baseUrlOrigin] : []);
 
+// Un origen configurado sin puerto (http://localhost) vale para cualquier
+// puerto, que es lo que necesita `flutter run -d chrome`. Para cualquier otro
+// host la comparacion es exacta: con startsWith, permitir https://app.bluice.com
+// dejaba pasar tambien https://app.bluice.com.atacante.com, que es un origen
+// distinto y puede leer las respuestas con credenciales.
+function isOriginAllowed(origin) {
+  return allowedOrigins.some((allowed) => {
+    if (allowed === origin) return true;
+    const bare = allowed.match(/^(https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\])):?$/);
+    return bare ? origin.startsWith(`${bare[1]}:`) : false;
+  });
+}
+
 app.use(cors({
   origin: (origin, cb) => {
-    if (!origin || allowedOrigins.some(o => origin.startsWith(o))) {
-      cb(null, true);
-    } else {
-      cb(new Error('Not allowed by CORS'));
+    if (!origin) {
+      return cb(null, true);
     }
+    const allowed = isOriginAllowed(origin);
+    cb(allowed ? null : new Error('Not allowed by CORS'), allowed);
   },
+  // Necesario para que el navegador acepte la descarga del Excel: el token va
+  // en la cabecera Authorization, que convierte la peticion en una que exige
+  // preflight. Ademas el frontend necesita leer Content-Disposition para
+  // nombrar el archivo.
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  exposedHeaders: ['Content-Disposition'],
   credentials: true
 }));
 

@@ -123,6 +123,14 @@ const authController = {
         email_confirm: false
       });
 
+      // Enviar email de confirmacion automaticamente después de crear el usuario
+      try {
+        await sendConfirmationEmail(email, nombre, undefined);
+      } catch (emailError) {
+        console.error('Error al enviar email de confirmacion:', emailError.message);
+        // El registro sigue exitoso, solo que el email no se envió
+      }
+
       res.status(201).json({
         message: 'Cliente registrado con exito.',
         user: {
